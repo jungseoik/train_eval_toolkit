@@ -131,4 +131,3 @@ def preprocess_video_chunk_split_folder(
     )
     
     print(f"All videos from '{input_folder}' have been processed and saved to '{output_folder}'.")
-

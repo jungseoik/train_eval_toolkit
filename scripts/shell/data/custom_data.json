@@ -1,0 +1,9 @@
+{
+    "GangNam": {
+      "root": "/home/piawsa6000/nas192/datasets/projects/gangnam_innovation/violence_fintuning/TADO_Violence_GangNAM/data/",
+      "annotation": "/home/piawsa6000/nas192/datasets/projects/gangnam_innovation/violence_fintuning/TADO_Violence_GangNAM/configs/instruction/exper000.jsonl",
+      "data_augment": false,
+      "repeat_time": 1,
+      "length": 30498
+    }
+}

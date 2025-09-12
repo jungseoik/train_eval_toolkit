@@ -208,7 +208,9 @@ __marimo__/
 
 data/*
 .qodo
-gmail-361002-cbcf95afec4a.json
+configs/gmail-361002-cbcf95afec4a.json
 assets/
 DUAL_VAD_ICCE_2025/
 IntenVL3_Violence_SFT
+*jsonl
+ckpts/*
