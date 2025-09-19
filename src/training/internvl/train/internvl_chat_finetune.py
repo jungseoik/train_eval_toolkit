@@ -525,7 +525,7 @@ class LazySupervisedDataset(Dataset):
     def video_get_item(self, data_item):
         # Build transformation function
         transform = self.get_transform()
-
+        
         # Ensure the first conversation contains a video placeholder
         if '<video>' not in data_item['conversations'][0]['value']:
             data_item['conversations'][0]['value'] = '<video>\n' + data_item['conversations'][0]['value']
@@ -551,6 +551,13 @@ class LazySupervisedDataset(Dataset):
             min_num_frames, max_num_frames = 12, 12
         elif video_type == 'video':
             min_num_frames, max_num_frames = 12, 12
+        elif video_type == "aihub_store":
+            min_num_frames, max_num_frames = 1, 20
+        elif video_type == "ai_hub_spaces":
+            min_num_frames, max_num_frames = 12, 24
+        elif video_type == "gj":
+            min_num_frames, max_num_frames = 12, 12
+
         if 'sampled_frames' in data_item.keys():
             sampled_frames = data_item['sampled_frames']
             image_list = read_frames_decord(video_path, num_frames=max_num_frames, min_num_frames=min_num_frames, sample='rand', frame_indices=sampled_frames)

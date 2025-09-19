@@ -30,3 +30,4 @@ transformers==4.37.2
 yacs
 datasets
 gradio
+scikit-learn

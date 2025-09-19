@@ -1,7 +1,7 @@
 import json
 import os
 from typing import List, Dict, Any
-
+from pathlib import Path
 class JSONLMerger:
     """JSONL 파일을 합치고 ID를 연속적으로 다시 매기는 클래스"""
     def __init__(self):
@@ -26,6 +26,9 @@ class JSONLMerger:
     def write_jsonl(self, data: List[Dict[Any, Any]], output_path: str):
         """데이터를 JSONL 파일로 저장"""
         try:
+            path = Path(output_path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            
             with open(output_path, 'w', encoding='utf-8') as f:
                 for item in data:
                     f.write(json.dumps(item, ensure_ascii=False) + '\n')
@@ -37,7 +40,6 @@ class JSONLMerger:
         """두 JSONL 파일을 합치고 ID를 연속적으로 다시 매기기"""
         print(f"첫 번째 파일 읽는 중: {file1_path}")
         data1 = self.read_jsonl(file1_path)
-        
         print(f"두 번째 파일 읽는 중: {file2_path}")
         data2 = self.read_jsonl(file2_path)
         

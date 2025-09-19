@@ -209,8 +209,10 @@ __marimo__/
 data/*
 .qodo
 configs/gmail-361002-cbcf95afec4a.json
+!assets/edit_video.png
 assets/
 DUAL_VAD_ICCE_2025/
 IntenVL3_Violence_SFT
 *jsonl
 ckpts/*
+results/eval_result/*

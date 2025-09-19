@@ -1,6 +1,7 @@
 # e.g.
 ## GPUS=2 PER_DEVICE_BATCH_SIZE=2 sh scripts/shell/internvl3.0/internvl3_2b_ft.sh
 # choose samller PER_DEVICE_BATCH_SIZE to reduce GPU Memory
+# GPUS=2 PER_DEVICE_BATCH_SIZE=2 sh scripts/shell/internvl3.0/internvl3_2b_ft2.sh
 set -x
 
 GPUS=${GPUS:-8}
@@ -35,7 +36,7 @@ torchrun \
   --model_name_or_path "ckpts/InternVL3-2B" \
   --conv_style "internvl2_5" \
   --output_dir ${OUTPUT_DIR} \
-  --meta_path "scripts/shell/data/custom_data.json" \
+  --meta_path "scripts/shell/data/train_gangnam_vietnam_rwf2000_aihubstore_gj_space_no_split.json" \
   --overwrite_output_dir True \
   --force_image_size 448 \
   --max_dynamic_patch 32 \

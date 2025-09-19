@@ -9,7 +9,7 @@ import numpy as np
 import cv2
 import tempfile
 import os
-
+from configs.constants import APP_PROMPT
 # 기존 코드들
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
@@ -69,8 +69,10 @@ def get_index(bound, fps, max_frame, first_idx=0, num_segments=32):
         start, end = bound[0], bound[1]
     else:
         start, end = -100000, 100000
-    start_idx = max(first_idx, round(start * fps))
-    end_idx = min(round(end * fps), max_frame)
+    # start_idx = max(first_idx, round(start * fps))
+    # end_idx = min(round(end * fps), max_frame)
+    start_idx = max(first_idx, start)
+    end_idx = min(end, max_frame)
     seg_size = float(end_idx - start_idx) / num_segments
     frame_indices = np.array([
         int(start_idx + (seg_size / 2) + np.round(seg_size * idx))
@@ -97,17 +99,20 @@ def load_video(video_path, bound=None, input_size=448, max_num=1, num_segments=3
     return pixel_values, num_patches_list
 
 class InternVL3Inferencer:
-    def __init__(self, model_id="OpenGVLab/InternVL3-2B", device="cuda:0"):
+    def __init__(self, model_path="ckpts/InternVL3-2B_total_vio", device="cuda:0"):
+    # def __init__(self, model_path="ckpts/merge_result", device="cuda:0"):
+    # def __init__(self, model_path="ckpts/InternVL3-2B", device="cuda:0"):
+    
         print("[INFO] InternVL 모델 로딩 중...")
         self.model = AutoModel.from_pretrained(
-            model_id,
+            model_path,
             torch_dtype=torch.bfloat16,
             low_cpu_mem_usage=True,
             use_flash_attn=False,
             trust_remote_code=True
         ).eval().to(device)
-
-        self.tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True, use_fast=False)
+        
+        self.tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True, use_fast=False)
         self.device = device
         self.generation_config = dict(max_new_tokens=1024, do_sample=False)
         print("[INFO] InternVL 모델 로딩 완료.")
@@ -227,10 +232,10 @@ def run_inference(video_path, template, num_segments, frame_idx, window_size):
         end_frame = int(frame_idx) + 1
         
         # 프레임을 시간으로 변환
-        start_time = start_frame / fps
-        end_time = end_frame / fps
-        
-        bound = [start_time, end_time]
+        # start_time = start_frame / fps
+        # end_time = end_frame / fps
+        # bound = [start_time, end_time]
+        bound = [start_frame, end_frame]
         
         result = inferencer.infer(
             video_path=video_path,
@@ -243,7 +248,7 @@ def run_inference(video_path, template, num_segments, frame_idx, window_size):
         return f"추론 중 오류가 발생했습니다: {str(e)}"
 
 # Gradio 인터페이스 구성
-with gr.Blocks(title="Video Analysis") as app:
+with gr.Blocks(title="Video Analysis") as demo:
     gr.Markdown("# Video Analysis Tool")
     with gr.Row():
         with gr.Column(scale=1):
@@ -254,8 +259,8 @@ with gr.Blocks(title="Video Analysis") as app:
             )
             
             init_btn = gr.Button("모델 초기화", variant="secondary")
+            inference_btn = gr.Button("추론 실행", variant="primary")
             init_status = gr.Textbox(label="모델 상태", value="모델이 초기화되지 않았습니다.", interactive=False)
-            
             video_info = gr.Textbox(label="비디오 정보", interactive=False)
             
             # 프레임 탐색 슬라이더
@@ -267,11 +272,11 @@ with gr.Blocks(title="Video Analysis") as app:
                 label="프레임 탐색",
                 interactive=True
             )
-            
+            example_image = gr.Image(label="예시" ,value="assets/edit_video.png")
             # 구간 선택을 위한 window_size 입력
             window_size_input = gr.Number(
                 label="Window Size (프레임 개수)",
-                value=10,
+                value=12,
                 minimum=1,
                 maximum=50,
                 step=1,
@@ -284,18 +289,18 @@ with gr.Blocks(title="Video Analysis") as app:
                 maximum=32,
                 value=12,
                 step=1,
-                label="프레임 추출 개수 (num_segments)"
+                label="window 안에서 추출할 프레임 개수 (num_segments)"
             )
             
             # 질문 입력
             template_input = gr.Textbox(
                 label="질문/템플릿",
+                value=APP_PROMPT,
                 placeholder="비디오에 대해 묻고 싶은 내용을 입력하세요...",
                 lines=3
             )
             
-            # 추론 버튼
-            inference_btn = gr.Button("추론 실행", variant="primary")
+
         
         # 오른쪽 열: 이미지 표시 및 결과
         with gr.Column(scale=1):
@@ -313,13 +318,13 @@ with gr.Blocks(title="Video Analysis") as app:
                 object_fit="contain"
             )
             
-            # # 추론 결과
-            # result_output = gr.Textbox(
-            #     label="추론 결과",
-            #     lines=8,
-            #     max_lines=15,
-            #     interactive=False
-            # )
+            # 추론 결과
+            result_output = gr.Textbox(
+                label="추론 결과",
+                lines=8,
+                max_lines=15,
+                interactive=False
+            )
     
     # 이벤트 핸들러들
     init_btn.click(
@@ -345,11 +350,11 @@ with gr.Blocks(title="Video Analysis") as app:
         outputs=[frame_display, frame_gallery]
     )
     
-    # inference_btn.click(
-    #     run_inference,
-    #     inputs=[video_input, template_input, num_segments_input, frame_slider, window_size_input],
-    #     outputs=result_output
-    # )
+    inference_btn.click(
+        run_inference,
+        inputs=[video_input, template_input, num_segments_input, frame_slider, window_size_input],
+        outputs=result_output
+    )
 
 if __name__ == "__main__":
-    app.launch(share=True, debug=True)
+    demo.launch( debug=True)

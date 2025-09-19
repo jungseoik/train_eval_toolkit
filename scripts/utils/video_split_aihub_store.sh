@@ -1,0 +1,1 @@
+python main.py aihub_store_split -i "data/raw/ai_hub_indoor_store_violence" -o "data/processed/ai_hub_indoor_store_violence" -p 8

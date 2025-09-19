@@ -7,7 +7,10 @@ from typing import Optional, List, Tuple
 from functools import partial
 from datetime import datetime
 from src.autolabel.gemini.gemini_api import GeminiImageAnalyzer
-from configs.config_gemini import PROMPT_VIDEO, GEMINI_MODEL_CONFIG
+from configs.config_gemini import PROMPT_VIDEO, GEMINI_MODEL_CONFIG, PROMPT_VIDEO_NORMAL_LABEL ,PROMPT_VIDEO_VIOLENCE_LABEL, PROMPT_VIDEO_NORMAL_LABEL_ENHANCED ,PROMPT_VIDEO_VIOLENCE_LABEL_ENHANCED
+from configs.config_gemini_violence_timestamp import PROMPT_VIDEO_VIOLENCE_TIMESTAMP_ENHANCED
+from configs.config_gemini_aihub_space import PROMPT_VIDEO_VIOLENCE_LABEL_ENHANCED_AIHUB_SPACE 
+from configs.config_gemini_gj_vio import PROMPT_VIDEO_VIOLENCE_LABEL_GJ , PROMPT_VIDEO_NORMAL_LABEL_GJ
 from src.utils.json_parser import parse_json_from_response
 
 def _label_single_video(
@@ -31,9 +34,23 @@ def _label_single_video(
         output_filepath = os.path.join(output_folder, f"{base_filename}.json")
         
         # --- 이미 결과 파일이 존재하면 건너뛰는 로직 ---
+        # if os.path.exists(output_filepath):
+        #     print(f"⏩ Skipping: Label file already exists for {os.path.basename(video_path)}")
+        #     return output_filepath # 이미 성공한 것으로 간주하고 경로 반환
         if os.path.exists(output_filepath):
-            print(f"⏩ Skipping: Label file already exists for {os.path.basename(video_path)}")
-            return output_filepath # 이미 성공한 것으로 간주하고 경로 반환
+            try:
+                with open(output_filepath, 'r', encoding='utf-8') as f:
+                    existing_data = json.load(f)
+                
+                # clips가 존재하고 비어있지 않으면 건너뛰기
+                if "clips" in existing_data and len(existing_data["clips"]) > 0:
+                    print(f"⏩ Skipping: Valid label file already exists for {os.path.basename(video_path)}")
+                    return output_filepath
+                else:
+                    print(f"🔄 Reprocessing: Empty clips found in {os.path.basename(video_path)}")
+            except (json.JSONDecodeError, KeyError) as e:
+                print(f"🔄 Reprocessing: Invalid JSON file for {os.path.basename(video_path)}: {e}")
+
 
         analyzer = GeminiImageAnalyzer(model_name=model_name, project=project, location=location)
         
@@ -71,7 +88,8 @@ def _label_single_video(
 def autolabel_videos_recursively(
     input_folder: str,
     failure_log_dir: str,
-    num_workers: Optional[int] = None
+    num_workers: Optional[int] = None,
+    options: str = "basic"
 ):
     """지정된 폴더와 모든 하위 폴더를 순회하며 비디오를 찾아 병렬로 오토라벨링합니다.
 
@@ -97,14 +115,64 @@ def autolabel_videos_recursively(
 
     print(f"Found {len(videos_to_process)} videos to process.")
     print(f"Using {num_workers if num_workers else 'all available'} CPU cores.")
+    
+    if options == "basic":
+        worker_func = partial(
+            _label_single_video,
+            prompt=PROMPT_VIDEO,
+            model_name=GEMINI_MODEL_CONFIG['model_name'],
+            project=GEMINI_MODEL_CONFIG['project'],
+            location=GEMINI_MODEL_CONFIG['location']
+        )
+    elif options == "normal":
+        worker_func = partial(
+            _label_single_video,
+            prompt=PROMPT_VIDEO_NORMAL_LABEL_ENHANCED,
+            model_name=GEMINI_MODEL_CONFIG['model_name'],
+            project=GEMINI_MODEL_CONFIG['project'],
+            location=GEMINI_MODEL_CONFIG['location']
+        )
+    elif options == "vio":
+        worker_func = partial(
+            _label_single_video,
+            prompt=PROMPT_VIDEO_VIOLENCE_LABEL_ENHANCED,
+            model_name=GEMINI_MODEL_CONFIG['model_name'],
+            project=GEMINI_MODEL_CONFIG['project'],
+            location=GEMINI_MODEL_CONFIG['location']
+        )
+    elif options == "vio_timestamp":
+        worker_func = partial(
+            _label_single_video,
+            prompt=PROMPT_VIDEO_VIOLENCE_TIMESTAMP_ENHANCED,
+            model_name=GEMINI_MODEL_CONFIG['model_name'],
+            project=GEMINI_MODEL_CONFIG['project'],
+            location=GEMINI_MODEL_CONFIG['location']
+        )
+    elif options == "aihub_space":
+        worker_func = partial(
+            _label_single_video,
+            prompt=PROMPT_VIDEO_VIOLENCE_LABEL_ENHANCED_AIHUB_SPACE,
+            model_name=GEMINI_MODEL_CONFIG['model_name'],
+            project=GEMINI_MODEL_CONFIG['project'],
+            location=GEMINI_MODEL_CONFIG['location']
+        )
+    elif options == "gj_normal":
+        worker_func = partial(
+            _label_single_video,
+            prompt= PROMPT_VIDEO_NORMAL_LABEL_GJ,
+            model_name=GEMINI_MODEL_CONFIG['model_name'],
+            project=GEMINI_MODEL_CONFIG['project'],
+            location=GEMINI_MODEL_CONFIG['location']
+        )
+    elif options == "gj_violence":
+        worker_func = partial(
+            _label_single_video,
+            prompt= PROMPT_VIDEO_VIOLENCE_LABEL_GJ,
+            model_name=GEMINI_MODEL_CONFIG['model_name'],
+            project=GEMINI_MODEL_CONFIG['project'],
+            location=GEMINI_MODEL_CONFIG['location']
+        )
 
-    worker_func = partial(
-        _label_single_video,
-        prompt=PROMPT_VIDEO,
-        model_name=GEMINI_MODEL_CONFIG['model_name'],
-        project=GEMINI_MODEL_CONFIG['project'],
-        location=GEMINI_MODEL_CONFIG['location']
-    )
 
     failed_videos = []
     with ProcessPoolExecutor(max_workers=num_workers) as executor:

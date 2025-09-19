@@ -1,0 +1,3 @@
+{
+    "python.analysis.exclude": ["**/node_modules", "data/*",".git", "myenv/**"]
+   }

@@ -1,0 +1,9 @@
+{
+    "GangNam": {
+      "root": "data/",
+      "annotation": "data/instruction/train/train_gangnam_vietnam_rwf2000_aihubstore_no_split.jsonl",
+      "data_augment": false,
+      "repeat_time": 1,
+      "length": 33266
+    }
+}
