@@ -1,7 +1,8 @@
 # e.g.
 ## GPUS=2 PER_DEVICE_BATCH_SIZE=2 sh scripts/shell/internvl3.0/internvl3_2b_ft.sh
 # choose samller PER_DEVICE_BATCH_SIZE to reduce GPU Memory
-# GPUS=2 PER_DEVICE_BATCH_SIZE=2 sh scripts/shell/internvl3.0/internvl3_2b_ft2.sh
+# h100
+# GPUS=4 PER_DEVICE_BATCH_SIZE=4 sh scripts/shell/internvl3.0/internvl3_2b_ft2.sh
 set -x
 
 GPUS=${GPUS:-8}

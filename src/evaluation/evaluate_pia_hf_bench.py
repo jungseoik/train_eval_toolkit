@@ -1,7 +1,6 @@
 import argparse
 import os
 import random
-import time
 import torch
 import torch.multiprocessing as mp
 from decord import VideoReader
@@ -18,37 +17,90 @@ import torchvision.transforms as T
 from torchvision.transforms.functional import InterpolationMode
 
 
+# ----------------------------
+# Preprocessing Utils
+# ----------------------------
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
-CLIP_MEAN = (0.4814546, 0.4578275, 0.40821073)
-CLIP_STD = (0.2686295, 0.2613025, 0.2757711)
 
+
+def build_transform(input_size: int = 448):
+    """Return torchvision transform matching InternVL pre-training."""
+    return T.Compose(
+        [
+            T.Lambda(lambda img: img.convert("RGB") if img.mode != "RGB" else img),
+            T.Resize((input_size, input_size), interpolation=InterpolationMode.BICUBIC),
+            T.ToTensor(),
+            T.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
+        ]
+    )
+
+
+def find_closest_aspect_ratio(aspect_ratio, target_ratios, width, height, image_size):
+    best_ratio_diff = float("inf")
+    best_ratio = (1, 1)
+    area = width * height
+    for ratio in target_ratios:
+        tgt_ar = ratio[0] / ratio[1]
+        diff = abs(aspect_ratio - tgt_ar)
+        if diff < best_ratio_diff or (
+            diff == best_ratio_diff and area > 0.5 * image_size * image_size * ratio[0] * ratio[1]
+        ):
+            best_ratio_diff = diff
+            best_ratio = ratio
+    return best_ratio
+
+
+def dynamic_preprocess(image, min_num=1, max_num=12, image_size=448, use_thumbnail=False):
+    """Split arbitrarily-sized image into ≤12 tiles sized 448×448 (InternVL spec)."""
+    ow, oh = image.size
+    aspect_ratio = ow / oh
+    target_ratios = sorted(
+        {
+            (i, j)
+            for n in range(min_num, max_num + 1)
+            for i in range(1, n + 1)
+            for j in range(1, n + 1)
+            if min_num <= i * j <= max_num
+        },
+        key=lambda x: x[0] * x[1],
+    )
+    ratio = find_closest_aspect_ratio(aspect_ratio, target_ratios, ow, oh, image_size)
+    tw, th = image_size * ratio[0], image_size * ratio[1]
+    blocks = ratio[0] * ratio[1]
+    resized = image.resize((tw, th))
+    tiles = [
+        resized.crop(
+            (
+                (idx % (tw // image_size)) * image_size,
+                (idx // (tw // image_size)) * image_size,
+                ((idx % (tw // image_size)) + 1) * image_size,
+                ((idx // (tw // image_size)) + 1) * image_size,
+            )
+        )
+        for idx in range(blocks)
+    ]
+    if use_thumbnail and blocks != 1:
+        tiles.append(image.resize((image_size, image_size)))
+    return tiles
+
+
+# ----------------------------
+# Model / Worker setup
+# ----------------------------
 worker_globals = {}
-
-
-def build_transform(is_train, input_size, normalize_type='imagenet'):
-    if normalize_type == 'imagenet':
-        MEAN, STD = IMAGENET_MEAN, IMAGENET_STD
-    elif normalize_type == 'clip':
-        MEAN, STD = CLIP_MEAN, CLIP_STD
-    else:
-        raise NotImplementedError
-    transform = T.Compose([
-        T.Lambda(lambda img: img.convert('RGB') if img.mode != 'RGB' else img),
-        T.Resize((input_size, input_size), interpolation=InterpolationMode.BICUBIC),
-        T.ToTensor(),
-        T.Normalize(mean=MEAN, std=STD)
-    ])
-    return transform
 
 
 def load_model_and_tokenizer(args):
     tokenizer = AutoTokenizer.from_pretrained(args.checkpoint, trust_remote_code=True, use_fast=False)
     model = InternVLChatModel.from_pretrained(
-        args.checkpoint, low_cpu_mem_usage=True, torch_dtype=torch.bfloat16,
-        load_in_8bit=args.load_in_8bit, load_in_4bit=args.load_in_4bit).eval()
+        args.checkpoint,
+        low_cpu_mem_usage=True,
+        torch_dtype=torch.bfloat16,
+        load_in_8bit=args.load_in_8bit,
+        load_in_4bit=args.load_in_4bit,
+    ).eval()
     return model, tokenizer
-
 
 def init_worker(model, tokenizer, args, local_rank):
     torch.cuda.set_device(local_rank)
@@ -57,10 +109,7 @@ def init_worker(model, tokenizer, args, local_rank):
     worker_globals['args'] = args
     worker_globals['local_rank'] = local_rank
     worker_globals['prompt'] = (
-        "Watch this short video clip and respond with exactly one JSON object.\n\n"
-        "- category must be 'violence' or 'normal'.\n"
-        "- If parsing fails, assume violence.\n"
-        "Output format: {\"category\":\"violence|normal\",\"description\":\"...\"}"
+        "Watch this short video clip and respond with exactly one JSON object.\n\n[Rules]\n- The category must be either 'violence' or 'normal'.  \n- Classify as violence if any of the following actions are present:  \n  * Punching  \n  * Kicking  \n  * Weapon Threat\n  * Weapon Attack\n  * Falling/Takedown  \n  * Pushing/Shoving  \n  * Brawling/Group Fight  \n- If none of the above are observed, classify as normal.  \n- The following cases must always be classified as normal:  \n  * Affection (hugging, holding hands, light touches)  \n  * Helping (supporting, assisting)  \n  * Accidental (unintentional bumping)  \n  * Playful (non-aggressive playful contact)  \n\n[Output Format]\n- Output exactly one JSON object.  \n- The object must contain only two keys: \"category\" and \"description\".  \n- The description should briefly and objectively describe the scene.  \n\nExample (violence):  \n{\"category\":\"violence\",\"description\":\"A man in a black jacket punches another man, who stumbles backward.\"}\n\nExample (normal):  \n{\"category\":\"normal\",\"description\":\"Two people are hugging inside an elevator"
     )
     worker_globals['image_size'] = model.config.force_image_size or model.config.vision_config.image_size
     worker_globals['transform'] = build_transform(is_train=False, input_size=worker_globals['image_size'])
@@ -106,35 +155,48 @@ def process_video(video_path):
 
     vlen = len(vr)
     results = np.zeros(vlen, dtype=int)
-
     ws = args.window_size
 
     # stride = window_size (겹치지 않게)
     for start in range(0, vlen, ws):
         end = min(start + ws, vlen)
-
-        # 프레임 인덱스
         frame_indices = list(range(start, end))
 
-        # 남는 프레임 처리: 마지막 프레임 반복해서 window_size 맞추기
-        if len(frame_indices) < ws:
-            frame_indices += [frame_indices[-1]] * (ws - len(frame_indices))
+        # ---- InternVL 전처리 (dynamic_preprocess) ----
+        pixel_values_list, num_patches_list = [], []
+        for idx in frame_indices:
+            img = Image.fromarray(vr[idx].asnumpy()).convert("RGB")
+            tiles = dynamic_preprocess(
+                img,
+                image_size=worker_globals["image_size"],
+                use_thumbnail=True,
+                max_num=1,
+            )
+            pv = [transform(tile) for tile in tiles]
+            pv = torch.stack(pv)
+            num_patches_list.append(pv.shape[0])
+            pixel_values_list.append(pv)
 
-        frames = vr.get_batch(frame_indices).asnumpy()
-        frames = [Image.fromarray(frames[i]) for i in range(frames.shape[0])]
-        pixel_values = torch.stack([transform(f) for f in frames])
-        pixel_values = pixel_values.to(f'cuda:{local_rank}', dtype=torch.bfloat16)
+        pixel_values = torch.cat(pixel_values_list).to(f"cuda:{local_rank}", dtype=torch.bfloat16)
+        # --- 수정된 부분 시작 ---
+        # 각 프레임에 대한 <image> 플레이스홀더를 동적으로 생성합니다.
+        # num_patches_list의 길이가 현재 처리 중인 프레임 수를 의미합니다.
+        video_prefix = ''.join([f'Frame{i+1}: <image>\n' for i in range(len(num_patches_list))])
+        # 생성된 prefix와 기존 프롬프트를 결합하여 최종 질문을 만듭니다.
+        final_question = video_prefix + prompt
+        # --- 수정된 부분 끝 ---
 
+        # 모델 추론
         pred = model.chat(
             tokenizer=tokenizer,
             pixel_values=pixel_values,
-            question=prompt,
+            question=final_question,
             generation_config=dict(num_beams=1, max_new_tokens=50, min_new_tokens=5),
-            verbose=False
+            num_patches_list=num_patches_list,
+            verbose=False,
         )
 
         category = parse_prediction(pred)
-
         # 윈도우 단위 결과 → start~end 범위 프레임 전체 채우기
         if category != 'normal':  # violence or parsing 실패 → violence
             results[start:end] = 1

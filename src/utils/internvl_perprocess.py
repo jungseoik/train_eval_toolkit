@@ -101,7 +101,7 @@ class InternVL3Inferencer:
             use_flash_attn=False,
             trust_remote_code=True
         ).eval().to(device)
-
+        
         self.tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True, use_fast=False)
         self.device = device
         self.generation_config = dict(max_new_tokens=1024, do_sample=False)
