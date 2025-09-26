@@ -1,0 +1,9 @@
+{
+    "SCVD_ALL_NO_WEAPON": {
+      "root": "data/",
+      "annotation": "data/instruction/train/train_scvdALL_NOweapon.jsonl",
+      "data_augment": false,
+      "repeat_time": 1,
+      "length": 2141
+    }
+}

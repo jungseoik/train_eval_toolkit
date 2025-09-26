@@ -11,6 +11,10 @@ from configs.config_gemini import PROMPT_VIDEO, GEMINI_MODEL_CONFIG, PROMPT_VIDE
 from configs.config_gemini_violence_timestamp import PROMPT_VIDEO_VIOLENCE_TIMESTAMP_ENHANCED
 from configs.config_gemini_aihub_space import PROMPT_VIDEO_VIOLENCE_LABEL_ENHANCED_AIHUB_SPACE 
 from configs.config_gemini_gj_vio import PROMPT_VIDEO_VIOLENCE_LABEL_GJ , PROMPT_VIDEO_NORMAL_LABEL_GJ
+from configs.config_gemini_cctv import PROMPT_VIDEO_VIOLENCE_LABEL_CCTV , PROMPT_VIDEO_NORMAL_LABEL_CCTV
+from configs.config_gemini_scvd import PROMPT_VIDEO_VIOLENCE_LABEL_SCVD , PROMPT_VIDEO_NORMAL_LABEL_SCVD
+
+
 from src.utils.json_parser import parse_json_from_response
 
 def _label_single_video(
@@ -172,7 +176,38 @@ def autolabel_videos_recursively(
             project=GEMINI_MODEL_CONFIG['project'],
             location=GEMINI_MODEL_CONFIG['location']
         )
-
+    elif options == "cctv_normal":
+        worker_func = partial(
+            _label_single_video,
+            prompt= PROMPT_VIDEO_NORMAL_LABEL_CCTV,
+            model_name=GEMINI_MODEL_CONFIG['model_name'],
+            project=GEMINI_MODEL_CONFIG['project'],
+            location=GEMINI_MODEL_CONFIG['location']
+        )
+    elif options == "cctv_violence":
+            worker_func = partial(
+                _label_single_video,
+                prompt= PROMPT_VIDEO_VIOLENCE_LABEL_CCTV,
+                model_name=GEMINI_MODEL_CONFIG['model_name'],
+                project=GEMINI_MODEL_CONFIG['project'],
+                location=GEMINI_MODEL_CONFIG['location']
+            )
+    elif options == "scvd_normal":
+            worker_func = partial(
+                _label_single_video,
+                prompt= PROMPT_VIDEO_NORMAL_LABEL_SCVD,
+                model_name=GEMINI_MODEL_CONFIG['model_name'],
+                project=GEMINI_MODEL_CONFIG['project'],
+                location=GEMINI_MODEL_CONFIG['location']
+            )
+    elif options == "scvd_violence":
+            worker_func = partial(
+                _label_single_video,
+                prompt= PROMPT_VIDEO_VIOLENCE_LABEL_SCVD,
+                model_name=GEMINI_MODEL_CONFIG['model_name'],
+                project=GEMINI_MODEL_CONFIG['project'],
+                location=GEMINI_MODEL_CONFIG['location']
+            )
 
     failed_videos = []
     with ProcessPoolExecutor(max_workers=num_workers) as executor:

@@ -11,3 +11,29 @@ python main.py autolabel -i "data/processed/gj_normal" -opt "gj_normal" -n 16
 python main.py autolabel -i "data/processed/gj_violence" -opt "gj_violence" -n 16
 
 
+python main.py autolabel -i "data/raw/ai_hub_cctv/noraml" -opt "cctv_normal" -n 16
+python main.py autolabel -i "data/raw/ai_hub_cctv/violence/ai_hub_cctv_violence" -opt "cctv_violence" -n 16
+python main.py autolabel -i "data/raw/ai_hub_cctv/violence/ai_hub_cctv_violence_assault" -opt "cctv_violence" -n 32
+python main.py autolabel -i "data/raw/ai_hub_cctv/violence/ai_hub_cctv_violence_datafight" -opt "cctv_violence" -n 16
+
+
+python main.py autolabel -i "data/raw/ai_hub_cctv/violence/ai_hub_cctv_violence_datafight" -opt "cctv_violence" -n 16
+python main.py autolabel -i "data/raw/ai_hub_cctv/violence/ai_hub_cctv_violence_datafight" -opt "cctv_violence" -n 16
+
+
+#### SCVD  오토라벨링
+python main.py autolabel -i "data/raw/smartcity_cctv_violence/SCVD/SCVD_converted/Train/Violence" -opt "scvd_violence" -n 16
+python main.py autolabel -i "data/raw/smartcity_cctv_violence/SCVD/SCVD_converted/Train/Weaponized" -opt "scvd_violence" -n 16
+python main.py autolabel -i "data/raw/smartcity_cctv_violence/SCVD/SCVD_converted/Train/Normal" -opt "scvd_normal" -n 16
+
+python main.py autolabel -i "data/raw/smartcity_cctv_violence/SCVD/SCVD_converted/Test/Violence" -opt "scvd_violence" -n 16
+python main.py autolabel -i "data/raw/smartcity_cctv_violence/SCVD/SCVD_converted/Test/Weaponized" -opt "scvd_violence" -n 16
+python main.py autolabel -i "data/raw/smartcity_cctv_violence/SCVD/SCVD_converted/Test/Normal" -opt "scvd_normal" -n 16
+
+python main.py autolabel -i "data/raw/smartcity_cctv_violence/SCVD/SCVD_converted_sec_split/Train/Violence" -opt "scvd_violence" -n 16
+python main.py autolabel -i "data/raw/smartcity_cctv_violence/SCVD/SCVD_converted_sec_split/Train/Weaponized" -opt "scvd_violence" -n 16
+python main.py autolabel -i "data/raw/smartcity_cctv_violence/SCVD/SCVD_converted_sec_split/Train/Normal" -opt "scvd_normal" -n 16
+
+python main.py autolabel -i "data/raw/smartcity_cctv_violence/SCVD/SCVD_converted_sec_split/Test/Violence" -opt "scvd_violence" -n 16
+python main.py autolabel -i "data/raw/smartcity_cctv_violence/SCVD/SCVD_converted_sec_split/Test/Weaponized" -opt "scvd_violence" -n 16
+python main.py autolabel -i "data/raw/smartcity_cctv_violence/SCVD/SCVD_converted_sec_split/Test/Normal" -opt "scvd_normal" -n 16

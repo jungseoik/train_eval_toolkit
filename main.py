@@ -35,7 +35,7 @@ def run_aihub_store_video_split(args):
     process_videos_clips_aihub_store(args.input_dir, args.output_dir, args.num_processes)
 from src.preprocess.label2jsonl import label_to_jsonl_result_save
 def run_label_to_jsonl(args):
-    label_to_jsonl_result_save(args.input_dir, args.output_file)
+    label_to_jsonl_result_save(args.input_dir, args.output_file, args.option)
 
 def run_preprocess(args): # 이제 각 함수는 args를 받을 수 있습니다.
     """전처리 프로세스를 실행합니다."""
@@ -83,7 +83,9 @@ if __name__ == '__main__':
     parser_autolabel = subparsers.add_parser('autolabel', help='Run the autolabeling process.')
     parser_autolabel.add_argument('-i', '--input-dir', type=str, required=True,
                                  help='Input directory containing video clips')
-    parser_autolabel.add_argument('-opt','--options', choices=['vio', 'normal', 'basic','vio_timestamp', "aihub_space" , "gj_normal" , "gj_violence"], 
+    parser_autolabel.add_argument('-opt','--options', choices=['vio', 'normal', 'basic','vio_timestamp', 
+                                                               "aihub_space" , "gj_normal" , "gj_violence",
+                                                               "cctv_normal" , "cctv_violence", "scvd_normal" , "scvd_violence"],  
                                  required=True, help='Labeling mode')
     parser_autolabel.add_argument('-n','--num_process', type=int, default=8, 
                                  required=False, help='Num processes')
@@ -112,6 +114,9 @@ if __name__ == '__main__':
                             help='A directory containing labels')
     parser_label_to_jsonl.add_argument('-o', '--output_file', type=str, required=True,
                             help='Location of jsonl file to save') 
+    parser_label_to_jsonl.add_argument('-opt', '--option', default="train", type=str, required=False,
+                            help='train or test extract mode select') 
+    
     parser_label_to_jsonl.set_defaults(func=run_label_to_jsonl)    
 
     # --- 'gj_split_video' 서브 파서 ---
@@ -149,27 +154,3 @@ if __name__ == '__main__':
     args = parser.parse_args()
     args.func(args)
 
-
-    # # 전처리 프로세스
-    # print("--- Running video_splitter module as a standalone script for demonstration ---")
-    # os.makedirs(INPUT_VIDEO_DIRECTORY, exist_ok=True)
-    # preprocess_video_chunk_split_folder(
-    #     input_folder=INPUT_VIDEO_DIRECTORY,
-    #     output_folder=OUTPUT_CLIPS_DIRECTORY,
-    #     seconds_per_clip=CLIP_DURATION,
-    #     num_workers=NUM_CORES
-    # )
-    
-    # ### 오토라벨 프로세스
-    # INPUT_ROOT_DIR = "data/processed/violence_inside_elevator_clips_2sec"
-    # FAILURE_LOG_DIR = "assets/logs"
-    # NUM_CORES = 8
-    
-    # print("--- Running Gemini Autolabeler (Recursive) ---")
-    # autolabel_videos_recursively(
-    #     input_folder=INPUT_ROOT_DIR,
-    #     failure_log_dir=FAILURE_LOG_DIR,
-    #     num_workers=NUM_CORES
-    # )
-    
-    

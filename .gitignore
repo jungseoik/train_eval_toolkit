@@ -216,3 +216,5 @@ IntenVL3_Violence_SFT
 *jsonl
 ckpts/*
 results/eval_result/*
+*.csv
+results/*

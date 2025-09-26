@@ -4,36 +4,39 @@ import json
 import os
 import random
 import time
-from functools import partial
 
 import torch
-from decord import VideoReader, cpu
+import torch.multiprocessing as mp
+from decord import VideoReader
 from PIL import Image
 from tqdm import tqdm
 import numpy as np
 import re
-
+from sklearn.metrics import f1_score, precision_score, recall_score
 from src.training.internvl.model.internvl_chat import InternVLChatConfig, InternVLChatModel
 from transformers import AutoTokenizer
 import torchvision.transforms as T
 from torchvision.transforms.functional import InterpolationMode
-
+import torch
+from transformers import AutoModel, AutoTokenizer
+from PIL import Image
+import torchvision.transforms as T
+from torchvision.transforms.functional import InterpolationMode
+from decord import VideoReader, cpu
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
+import numpy as np
 
-### MODIFICATION START ###
-# 새로운 비디오 전처리 및 로딩 함수들을 여기에 추가합니다.
-# 기존의 get_frame_indices, read_frames_decord, build_transform 함수는
-# 아래의 새로운 함수들로 대체되므로 제거하거나 주석 처리합니다.
-
-def build_transform(input_size=448):
+def build_transform(input_size: int = 448):
     """Return torchvision transform matching InternVL pre‑training."""
-    return T.Compose([
-        T.Lambda(lambda img: img.convert('RGB') if img.mode != 'RGB' else img),
-        T.Resize((input_size, input_size), interpolation=InterpolationMode.BICUBIC),
-        T.ToTensor(),
-        T.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
-    ])
+    return T.Compose(
+        [
+            T.Lambda(lambda img: img.convert("RGB") if img.mode != "RGB" else img),
+            T.Resize((input_size, input_size), interpolation=InterpolationMode.BICUBIC),
+            T.ToTensor(),
+            T.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
+        ]
+    )
 
 def find_closest_aspect_ratio(aspect_ratio, target_ratios, width, height, image_size):
     best_ratio_diff = float("inf")
@@ -46,6 +49,7 @@ def find_closest_aspect_ratio(aspect_ratio, target_ratios, width, height, image_
             best_ratio_diff = diff
             best_ratio = ratio
     return best_ratio
+
 
 def dynamic_preprocess(image, min_num=1, max_num=12, image_size=448, use_thumbnail=False):
     """Split arbitrarily‑sized image into ≤12 tiles sized 448×448 (InternVL spec)."""
@@ -86,8 +90,6 @@ def get_index(bound, fps, max_frame, first_idx=0, num_segments=32):
         int(start_idx + (seg_size / 2) + np.round(seg_size * idx))
         for idx in range(num_segments)
     ])
-    # Ensure indices are within bounds
-    frame_indices = np.clip(frame_indices, 0, max_frame).astype(int)
     return frame_indices
 
 def load_video(video_path, bound=None, input_size=448, max_num=1, num_segments=32):
@@ -98,20 +100,15 @@ def load_video(video_path, bound=None, input_size=448, max_num=1, num_segments=3
     pixel_values_list, num_patches_list = [], []
     transform = build_transform(input_size=input_size)
     frame_indices = get_index(bound, fps, max_frame, first_idx=0, num_segments=num_segments)
-    
     for frame_index in frame_indices:
         img = Image.fromarray(vr[frame_index].asnumpy()).convert('RGB')
-        # 각 프레임을 dynamic_preprocess로 처리 (max_num=1이면 타일링 안 함)
-        img_tiles = dynamic_preprocess(img, image_size=input_size, use_thumbnail=True, max_num=max_num)
-        pixel_values = [transform(tile) for tile in img_tiles]
+        img = dynamic_preprocess(img, image_size=input_size, use_thumbnail=True, max_num=max_num)
+        pixel_values = [transform(tile) for tile in img]
         pixel_values = torch.stack(pixel_values)
         num_patches_list.append(pixel_values.shape[0])
         pixel_values_list.append(pixel_values)
-        
     pixel_values = torch.cat(pixel_values_list)
     return pixel_values, num_patches_list
-
-### MODIFICATION END ###
 
 
 def load_model_and_tokenizer(args):
@@ -119,78 +116,104 @@ def load_model_and_tokenizer(args):
     model = InternVLChatModel.from_pretrained(
         args.checkpoint, low_cpu_mem_usage=True, torch_dtype=torch.bfloat16,
         load_in_8bit=args.load_in_8bit, load_in_4bit=args.load_in_4bit).eval()
-    if not args.load_in_8bit and not args.load_in_4bit:
-        model = model.cuda()
+    # MODIFIED: Move to device is handled by the main process
+    # if not args.load_in_8bit and not args.load_in_4bit:
+    #     model = model.cuda()
     return model, tokenizer
 
+# 전역 변수 및 워커 초기화 함수
+worker_globals = {}
 
-### MODIFICATION START ###
-# VideoClassificationDataset과 collate_fn을 새로운 비디오 처리 방식에 맞게 수정합니다.
-
-class VideoClassificationDataset(torch.utils.data.Dataset):
-    def __init__(self, annotation_path, num_frames=16, input_size=224, video_root='', max_tiles=1):
-        self.data = []
-        with open(annotation_path, 'r') as f:
-            for line in f:
-                self.data.append(json.loads(line))
-        
-        self.num_frames = num_frames
-        self.input_size = input_size
-        self.video_root = video_root
-        self.max_tiles = max_tiles # 각 프레임을 몇 개의 타일로 나눌지 결정
-        print(f"Found {len(self.data)} videos in {annotation_path}")
-
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, idx):
-        item = self.data[idx]
-        video_path = os.path.join(self.video_root, item['video'])
-        video_id = item.get('id', video_path)
-
-        try:
-            gt_value_str = item['conversations'][0]['value']
-            ground_truth_category = json.loads(gt_value_str)['category']
-        except (json.JSONDecodeError, KeyError, IndexError) as e:
-            print(f"Error parsing ground truth for video_id {video_id}: {e}")
-            ground_truth_category = "parsing_error"
-
-        try:
-            # 새로운 load_video 함수 사용
-            pixel_values, num_patches_list = load_video(
-                video_path, 
-                num_segments=self.num_frames, 
-                input_size=self.input_size,
-                max_num=self.max_tiles
-            )
-        except Exception as e:
-            print(f"Error processing video {video_path}: {e}")
-            # 에러 발생 시 더미 데이터 반환
-            pixel_values = torch.zeros((self.num_frames, 3, self.input_size, self.input_size))
-            num_patches_list = [1] * self.num_frames
-
-        return {
-            'video_id': video_id,
-            'pixel_values': pixel_values,
-            'num_patches_list': num_patches_list,
-            'ground_truth': ground_truth_category,
-        }
-
-def collate_fn(inputs):
-    # 배치 사이즈가 1로 고정되어 있으므로, 리스트의 첫 번째 원소만 사용
-    batch = inputs[0]
-    pixel_values = batch['pixel_values']
-    num_patches_list = batch['num_patches_list']
-    video_id = batch['video_id']
-    ground_truth = batch['ground_truth']
+# MODIFIED: local_rank를 인자로 받도록 수정
+def init_worker(model, tokenizer, args, local_rank):
+    """각 워커 프로세스를 초기화하는 함수"""
+    # ADDED: 워커의 GPU 장치를 명시적으로 설정!
+    torch.cuda.set_device(local_rank)
     
-    # DataLoader가 배치 차원을 추가하지 않도록 단일 아이템을 직접 반환
-    # 단, 나중에 루프에서 일관성을 위해 리스트로 감싸줍니다.
-    return pixel_values, [num_patches_list], [video_id], [ground_truth]
+    worker_globals['model'] = model
+    worker_globals['tokenizer'] = tokenizer
+    worker_globals['args'] = args
+    worker_globals['local_rank'] = local_rank # 나중에 사용하기 위해 저장
+    worker_globals['prompt'] = (
+        "Watch this short video clip and respond with exactly one JSON object.\n\n[Rules]\n- The category must be either 'violence' or 'normal'.  \n- Classify as violence if any of the following actions are present:  \n  * Punching  \n  * Kicking  \n  * Weapon Threat\n  * Weapon Attack\n  * Falling/Takedown  \n  * Pushing/Shoving  \n  * Brawling/Group Fight  \n- If none of the above are observed, classify as normal.  \n- The following cases must always be classified as normal:  \n  * Affection (hugging, holding hands, light touches)  \n  * Helping (supporting, assisting)  \n  * Accidental (unintentional bumping)  \n  * Playful (non-aggressive playful contact)  \n\n[Output Format]\n- Output exactly one JSON object.  \n- The object must contain only two keys: \"category\" and \"description\".  \n- The description should briefly and objectively describe the scene.  \n\nExample (violence):  \n{\"category\":\"violence\",\"description\":\"A man in a black jacket punches another man, who stumbles backward.\"}\n\nExample (normal):  \n{\"category\":\"normal\",\"description\":\"Two people are hugging inside an elevator"
+    )
+    worker_globals['image_size'] = model.config.force_image_size or model.config.vision_config.image_size
+    worker_globals['transform'] = build_transform(input_size=worker_globals['image_size'])
 
-### MODIFICATION END ###
+# 단일 비디오 처리 워커 함수
+# process_video 함수를 아래 코드로 교체
+def process_video(item):
+    """워커 프로세스가 실행할 단일 비디오 처리 로직"""
+    model = worker_globals['model']
+    tokenizer = worker_globals['tokenizer']
+    args = worker_globals['args']
+    # <<< DELETED: 고정 프롬프트는 여기서 더 이상 사용하지 않음
+    # prompt = worker_globals['prompt'] 
+    transform = worker_globals['transform']
+    local_rank = worker_globals['local_rank']
 
+    video_path = os.path.join(args.video_root, item['video'])
+    video_id = item.get('id', video_path)
+    video_path_log = item['video']
 
+    try:
+        gt_value_str = item['conversations'][0]['value']
+        ground_truth_category = json.loads(gt_value_str)['category']
+    except Exception:
+        ground_truth_category = "parsing_error"
+
+    # <<< CHANGED: 비디오 로딩 및 전처리 방식을 새로운 `load_video`로 변경
+    try:
+        # InternVL3의 공식 전처리 함수를 사용합니다.
+        # max_num=1은 이미지를 타일로 나누지 않고 1개의 448x448 이미지로 처리하겠다는 의미입니다. 
+        # 더 많은 타일을 사용하려면 이 값을 늘릴 수 있습니다.
+        pixel_values, num_patches_list = load_video(
+            video_path, 
+            num_segments=args.num_frames, 
+            input_size=worker_globals['image_size'],
+            max_num=1 # 고품질 추론을 위해 4 또는 6으로 늘리는 것을 고려
+        )
+        pixel_values = pixel_values.to(f'cuda:{local_rank}', dtype=torch.bfloat16)
+        
+    except Exception as e:
+        print(f"Error processing video {video_path}: {e}")
+        return None
+
+    # <<< CHANGED: 프롬프트를 동적으로 생성
+    # 1. 처리된 프레임 수에 맞춰 <image> 토큰을 포함한 비디오 프리픽스를 만듭니다.
+    video_prefix = ''.join([f'Frame{i+1}: <image>\n' for i in range(len(num_patches_list))])
+
+    # 2. 기존의 상세한 지시사항(템플릿)을 정의합니다.
+    prompt_template = (
+        "Watch this short video clip and respond with exactly one JSON object.\n\n[Rules]\n- The category must be either 'violence' or 'normal'.  \n- Classify as violence if any of the following actions are present:  \n  * Punching  \n  * Kicking  \n  * Weapon Threat\n  * Weapon Attack\n  * Falling/Takedown  \n  * Pushing/Shoving  \n  * Brawling/Group Fight  \n- If none of the above are observed, classify as normal.  \n- The following cases must always be classified as normal:  \n  * Affection (hugging, holding hands, light touches)  \n  * Helping (supporting, assisting)  \n  * Accidental (unintentional bumping)  \n  * Playful (non-aggressive playful contact)  \n\n[Output Format]\n- Output exactly one JSON object.  \n- The object must contain only two keys: \"category\" and \"description\".  \n- The description should briefly and objectively describe the scene.  \n\nExample (violence):  \n{\"category\":\"violence\",\"description\":\"A man in a black jacket punches another man, who stumbles backward.\"}\n\nExample (normal):  \n{\"category\":\"normal\",\"description\":\"Two people are hugging inside an elevator"
+    )
+
+    # 3. 비디오 프리픽스와 템플릿을 합쳐 최종 질문을 완성합니다.
+    question = video_prefix + prompt_template
+    # <<< END OF CHANGES
+
+    pred = model.chat(
+        tokenizer=tokenizer,
+        pixel_values=pixel_values,
+        question=question, # 새로 생성된 동적 프롬프트 사용
+        generation_config=dict(
+            num_beams=args.num_beams,
+            max_new_tokens=50,
+            min_new_tokens=5,
+        ),
+        verbose=False
+    )
+
+    predicted_category = parse_prediction(pred)
+
+    return {
+        'video_path_log' : video_path_log,
+        'video_id': video_id,
+        'prediction': predicted_category,
+        'ground_truth': ground_truth_category,
+        'is_correct': predicted_category == ground_truth_category,
+        'pred_result' : pred
+    }
 class InferenceSampler(torch.utils.data.sampler.Sampler):
     def __init__(self, size):
         self._size = int(size)
@@ -215,164 +238,224 @@ class InferenceSampler(torch.utils.data.sampler.Sampler):
         return len(self._local_indices)
 
 def parse_prediction(pred_str: str) -> str:
-    """모델의 출력 문자열에서 JSON을 파싱하여 category 값을 추출합니다."""
+    """
+    모델의 출력 문자열에서 다양한 케이스를 고려하여 'category' 값을 파싱합니다.
+    """
     try:
-        if '```json' in pred_str:
-            pred_str = pred_str.split('```json')[1].split('```')[0]
-        elif '```' in pred_str:
-            pred_str = pred_str.split('```')[1].split('```')[0]
-            
-        match = re.search(r'\{.*\}', pred_str, re.DOTALL)
-        if match:
-            json_str = match.group(0)
-            data = json.loads(json_str)
-            return data.get('category', 'parsing_failed')
-        else:
-            return 'no_json_found'
+        # 1단계: 입력 문자열 정규화 (마크다운 및 공백 제거)
+        clean_str = pred_str
+        if '```json' in clean_str:
+            clean_str = clean_str.split('```json')[1].split('```')[0]
+        elif '```' in clean_str:
+            clean_str = clean_str.split('```')[1].split('```')[0]
+        clean_str = clean_str.strip()
+
+        # 2단계: 완전한 JSON 객체 파싱 시도
+        # 문자열에서 첫 '{'와 마지막 '}'를 찾아 JSON 부분만 추출
+        start_brace = clean_str.find('{')
+        end_brace = clean_str.rfind('}')
+        if start_brace != -1 and end_brace != -1 and start_brace < end_brace:
+            json_part = clean_str[start_brace : end_brace + 1]
+            try:
+                data = json.loads(json_part)
+                category = data.get('category')
+                if category in ['violence', 'normal']:
+                    return category
+            except json.JSONDecodeError:
+                # JSON 파싱에 실패하면 다음 단계로 넘어감
+                pass
+
+        # 3단계: 정규표현식을 이용한 키-값 직접 추출 (Fallback)
+        # "category" : "value" 패턴을 직접 찾음 (따옴표 종류, 공백 유연하게 처리)
+        # 예: "category":"normal", 'category' : 'violence' 등
+        cat_match = re.search(r'["\']category["\']\s*:\s*["\'](violence|normal)["\']', clean_str)
+        if cat_match:
+            return cat_match.group(1)  # "violence" 또는 "normal" 반환
+
+        # 4단계: 모든 시도가 실패한 경우
+        return 'no_json_found'
+
     except Exception:
+        # 함수 실행 중 예상치 못한 에러 발생 시
         return 'parsing_failed'
 
-def evaluate_video_classification():
-    # 모델에 비디오에 대한 분류를 요청하는 프롬프트 (이제 <image> 플레이스홀더는 동적으로 생성됨)
-    prompt = (
-        "Watch this short video clip and respond with exactly one JSON object.\n\n[Rules]\n- The category must be either 'violence' or 'normal'.  \n- Classify as violence if any of the following actions are present:  \n  * Punching  \n  * Kicking  \n  * Weapon Threat\n  * Weapon Attack\n  * Falling/Takedown  \n  * Pushing/Shoving  \n  * Brawling/Group Fight  \n- If none of the above are observed, classify as normal.  \n- The following cases must always be classified as normal:  \n  * Affection (hugging, holding hands, light touches)  \n  * Helping (supporting, assisting)  \n  * Accidental (unintentional bumping)  \n  * Playful (non-aggressive playful contact)  \n\n[Output Format]\n- Output exactly one JSON object.  \n- The object must contain only two keys: \"category\" and \"description\".  \n- The description should briefly and objectively describe the scene.  \n\nExample (violence):  \n{\"category\":\"violence\",\"description\":\"A man in a black jacket punches another man, who stumbles backward.\"}\n\nExample (normal):  \n{\"category\":\"normal\",\"description\":\"Two people are hugging inside an elevator"
-      
-    )
-    print('Prompt Body:', prompt)
+# MODIFIED: local_rank, model, tokenizer, args를 인자로 받도록 수정
+def evaluate_video_classification_parallel(local_rank, model, tokenizer, args):
+    all_data = []
+    with open(args.annotation, 'r') as f:
+        for line in f:
+            all_data.append(json.loads(line))
 
-    ### MODIFICATION START ###
-    # 데이터셋 생성 시 새로운 인자(max_tiles)를 전달합니다.
-    dataset = VideoClassificationDataset(
-        annotation_path=args.annotation,
-        num_frames=args.num_frames,
-        input_size=image_size,
-        video_root=args.video_root,
-        max_tiles=args.max_tiles
-    )
-    ### MODIFICATION END ###
+    sampler = InferenceSampler(len(all_data))
+    my_data_indices = list(sampler)
+    my_data = [all_data[i] for i in my_data_indices]
     
-    dataloader = torch.utils.data.DataLoader(
-        dataset=dataset,
-        sampler=InferenceSampler(len(dataset)),
-        batch_size=args.batch_size,
-        num_workers=args.num_workers,
-        pin_memory=True,
-        drop_last=False,
-        collate_fn=collate_fn,
-    )
+    rank = torch.distributed.get_rank()
+    print(f"Rank {rank} (GPU {local_rank}) processing {len(my_data)} videos.")
 
     results_list = []
-    ### MODIFICATION START ###
-    # Dataloader의 반환값이 변경되었으므로 루프 변수를 수정합니다.
-    for pixel_values, num_patches_lists, video_ids, ground_truths in tqdm(dataloader):
-        pixel_values = pixel_values.to(torch.bfloat16).cuda()
-        
-        # 배치 사이즈가 1이므로 첫 번째 아이템의 num_patches_list를 사용
-        num_patches_list = num_patches_lists[0]
-        
-        # 비디오 프레임에 대한 프롬프트 접두사 생성
-        video_prefix = ''.join([f'Frame{i+1}: <image>\n' for i in range(len(num_patches_list))])
-        # 최종 질문 구성
-        question = video_prefix + prompt
-        
-        pred = model.chat(
-            tokenizer=tokenizer,
-            pixel_values=pixel_values, # 이제 pixel_values는 (T*tiles, C, H, W) 형태
-            question=question,
-            generation_config=dict(
-                num_beams=args.num_beams,
-                max_new_tokens=50,
-                min_new_tokens=5,
-            ),
-            verbose=False
-        )
-    ### MODIFICATION END ###
-        
-        predicted_category = parse_prediction(pred)
-        
-        results_list.append({
-            'video_id': video_ids[0],
-            'prediction': predicted_category,
-            'ground_truth': ground_truths[0],
-            'is_correct': predicted_category == ground_truths[0]
-        })
+    ctx = mp.get_context('spawn')
+    
+    ## 수정파트
+    # 1. Pool을 with 구문 밖에서 직접 생성합니다.
+    pool = ctx.Pool(
+        processes=args.workers_per_gpu, 
+        initializer=init_worker, 
+        initargs=(model, tokenizer, args, local_rank)
+    )
+    
+    # 2. try...finally 구문으로 핵심 로직과 자원 해제를 감쌉니다.
+    try:
+        # 비디오 처리 로직은 try 블록 안에 위치시킵니다.
+        results_iterator = pool.imap_unordered(process_video, my_data)
+        for result in tqdm(results_iterator, total=len(my_data), desc=f"Rank {rank} Progress"):
+            if result is not None:
+                results_list.append(result)
+    finally:
+        # 3. 이 부분은 try 블록에서 에러가 발생하더라도 '항상' 실행됩니다.
+        #    따라서 좀비 프로세스가 남는 것을 방지할 수 있습니다.
+        print(f"Rank {rank} is finalizing the worker pool...")
+        pool.close()
+        pool.join()
 
+    # 4. 모든 워커 프로세스가 100% 안전하게 종료된 후에 분산 동기화를 시작합니다.
+    print(f"Rank {rank} has finished its jobs and is waiting at the barrier.")
     torch.distributed.barrier()
 
     world_size = torch.distributed.get_world_size()
     merged_results = [None for _ in range(world_size)]
     torch.distributed.all_gather_object(merged_results, results_list)
+    #### 수정파트
+    # with ctx.Pool(
+    #     processes=args.workers_per_gpu, 
+    #     initializer=init_worker, 
+    #     # MODIFIED: init_worker에 local_rank 전달
+    #     initargs=(model, tokenizer, args, local_rank)
+    # ) as pool:
+    #     for result in tqdm(pool.imap_unordered(process_video, my_data), total=len(my_data), desc=f"Rank {rank} Progress"):
+    #         if result is not None:
+    #             results_list.append(result)
 
-    if torch.distributed.get_rank() == 0:
+    # torch.distributed.barrier()
+
+    # world_size = torch.distributed.get_world_size()
+    # merged_results = [None for _ in range(world_size)]
+    # torch.distributed.all_gather_object(merged_results, results_list)
+    
+    if rank == 0:
         merged_results = list(itertools.chain.from_iterable(merged_results))
-        
         total_samples = len(merged_results)
-        correct_predictions = sum(1 for r in merged_results if r['is_correct'])
-        accuracy = (correct_predictions / total_samples) * 100 if total_samples > 0 else 0
+
+        y_true = []
+        y_pred = []
+        valid_gt_labels = {'violence', 'normal'}
+        
+        for r in merged_results:
+            # 정답 레이블이 유효한 경우에만 평가 데이터에 포함시킵니다.
+            if r['ground_truth'] in valid_gt_labels:
+                y_true.append(r['ground_truth'])
+                
+                # 새로운 규칙 적용: 예측이 'normal'이 아니면 모두 'violence'로 간주
+                if r['prediction'] == 'normal':
+                    y_pred.append('normal')
+                else:
+                    y_pred.append('violence')
+        
+        # 2. 유효한 데이터 기준으로 각종 지표를 다시 계산합니다.
+        valid_samples = len(y_true)
+        invalid_gt_samples = total_samples - valid_samples
+
+        correct_predictions = sum(1 for gt, pred in zip(y_true, y_pred) if gt == pred)
+        accuracy = (correct_predictions / valid_samples) * 100 if valid_samples > 0 else 0.0
+        
+        precision = precision_score(y_true, y_pred, pos_label='violence', zero_division=0)
+        recall = recall_score(y_true, y_pred, pos_label='violence', zero_division=0)
+        f1 = f1_score(y_true, y_pred, pos_label='violence', zero_division=0)
         
         print("\n--- Evaluation Summary ---")
-        print(f"Total Videos Evaluated: {total_samples}")
-        print(f"Correct Predictions: {correct_predictions}")
-        print(f"Accuracy: {accuracy:.2f}%")
-        print("--------------------------\n")
+        print(f"GPUs used: {world_size}")
+        print(f"Workers per GPU: {args.workers_per_gpu}")
+        print(f"Total Videos Submitted: {total_samples}")
+        print(f"Invalid Ground-Truth Samples (excluded): {invalid_gt_samples}")
+        print(f"Valid Videos Evaluated: {valid_samples}")
+        print("------------------------------------")
+        print(f"Accuracy: {accuracy:.2f}% ({correct_predictions}/{valid_samples})")
+        print(f"Precision (violence): {precision:.4f}")
+        print(f"Recall (violence):    {recall:.4f}")
+        print(f"F1-Score (violence):  {f1:.4f}")
+        print("------------------------------------\n")
+        
+        # 4. 파일 저장 로직은 그대로 유지합니다.
+        time_prefix = time.strftime('%Y_%m_%d', time.localtime())
+        model_name = os.path.basename(args.checkpoint)
+        dataset_name = os.path.splitext(os.path.basename(args.annotation))[0]
+        new_filename = f"{time_prefix}_{model_name}_{dataset_name}.json"
+        results_file_path = os.path.join(args.out_dir, new_filename)
 
-        time_prefix = time.strftime('%y%m%d%H%M%S', time.localtime())
-        results_file_path = os.path.join(args.out_dir, f'classification_results_{time_prefix}.json')
         with open(results_file_path, 'w') as f:
-            json.dump(merged_results, f, indent=4)
+            json.dump(merged_results, f, indent=4) # 전체 원본 결과는 그대로 저장
         print(f"Detailed results saved to: {results_file_path}")
 
+        # 5. 요약 파일에도 새로운 정보를 추가하여 저장합니다.
         summary_path = os.path.join(args.out_dir, 'evaluation_summary.txt')
         with open(summary_path, 'a') as f:
             f.write(f"Checkpoint: {args.checkpoint}\n")
             f.write(f"Annotation: {args.annotation}\n")
-            f.write(f"Total: {total_samples}, Correct: {correct_predictions}, Accuracy: {accuracy:.2f}%\n")
+            f.write(f"Total Samples: {total_samples} (Valid: {valid_samples}, Invalid GT: {invalid_gt_samples})\n")
+            f.write(f"Accuracy: {accuracy:.2f}%\n")
+            f.write(f"Precision: {precision:.4f}\n")
+            f.write(f"Recall: {recall:.4f}\n")
+            f.write(f"F1-Score: {f1:.4f}\n")
             f.write("-" * 20 + "\n")
         print(f"Summary saved to: {summary_path}")
-
     torch.distributed.barrier()
 
+import datetime # 파일 상단에 추가
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--checkpoint', type=str, required=True, help="Path to the model checkpoint")
-    parser.add_argument('--annotation', type=str, required=True, help="Path to the annotation .jsonl file")
-    parser.add_argument('--video-root', type=str, default='', help="Root directory for video files")
-    parser.add_argument('--out-dir', type=str, default='results', help="Directory to save evaluation results")
-    parser.add_argument('--num-frames', type=int, default=16, help="Number of frames to sample from each video")
-    
-    ### MODIFICATION START ###
-    # 각 프레임을 타일로 나눌 최대 개수 인자 추가
-    parser.add_argument('--max-tiles', type=int, default=1, help="Maximum number of tiles to split each frame into. 1 means no tiling.")
-    ### MODIFICATION END ###
-
-    parser.add_argument('--batch-size', type=int, default=1)
-    parser.add_argument('--num-workers', type=int, default=4)
+    parser.add_argument('--checkpoint', type=str, required=True)
+    parser.add_argument('--annotation', type=str, required=True)
+    parser.add_argument('--video-root', type=str, default='')
+    parser.add_argument('--out-dir', type=str, default='results/eval_result')
+    parser.add_argument('--num-frames', type=int, default=16)
+    parser.add_argument('--workers-per-gpu', type=int, default=4, help="Number of parallel processes per GPU.")
     parser.add_argument('--num-beams', type=int, default=1)
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--load-in-8bit', action='store_true')
     parser.add_argument('--load-in-4bit', action='store_true')
     args = parser.parse_args()
-
+    
+    timestamp = time.strftime('%Y_%m_%d_%H-%M-%S')
+    new_out_dir = os.path.join(args.out_dir, timestamp)
+    args.out_dir = new_out_dir
     if not os.path.exists(args.out_dir):
         os.makedirs(args.out_dir, exist_ok=True)
     
-    assert args.batch_size == 1, 'Only batch size 1 is supported for this evaluation script.'
+    # 기본 타임아웃은 30분입니다. 이것을 2시간 등으로 늘려줍니다.
+    timeout_delta = datetime.timedelta(hours=2)
+
 
     torch.distributed.init_process_group(
         backend='nccl',
         world_size=int(os.getenv('WORLD_SIZE', '1')),
         rank=int(os.getenv('RANK', '0')),
+        timeout=timeout_delta
     )
-    torch.cuda.set_device(int(os.getenv('LOCAL_RANK', 0)))
+    
+    # MODIFIED: local_rank를 변수로 저장
+    local_rank = int(os.getenv('LOCAL_RANK', 0))
+    torch.cuda.set_device(local_rank)
     
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     
     model, tokenizer = load_model_and_tokenizer(args)
-    image_size = model.config.force_image_size or model.config.vision_config.image_size
+    # MODIFIED: Move model to the correct device after loading
+    if not args.load_in_8bit and not args.load_in_4bit:
+        model = model.to(local_rank)
+
+    print(f'[INFO] Rank {torch.distributed.get_rank()} (GPU {local_rank}) loaded model from: {args.checkpoint}')
     
-    print(f'[INFO] Model loaded from: {args.checkpoint}')
-    print(f'[INFO] Image size: {image_size}')
-    
-    evaluate_video_classification()
+    # MODIFIED: local_rank와 로드된 객체들을 평가 함수에 인자로 전달
+    evaluate_video_classification_parallel(local_rank, model, tokenizer, args)

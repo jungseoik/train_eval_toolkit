@@ -53,8 +53,8 @@ def split_dataset_final(input_file='data.jsonl', test_ratio=0.1, output_dir='.')
                 try:
                     data = json.loads(line.strip())
 
-                    if data.get("type") not in ["clip", "video"]:
-                        continue
+                    # if data.get("type") not in ["clip", "video"]:
+                    #     continue
                     
                     video_path = data.get("video", "")
                     if not video_path: continue

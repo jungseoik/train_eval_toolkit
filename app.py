@@ -99,7 +99,10 @@ def load_video(video_path, bound=None, input_size=448, max_num=1, num_segments=3
     return pixel_values, num_patches_list
 
 class InternVL3Inferencer:
-    def __init__(self, model_path="ckpts/InternVL3-2B_total_vio", device="cuda:0"):
+    # def __init__(self, model_path="ckpts/InternVL3-2B_total_vio", device="cuda:0"):
+    def __init__(self, model_path="ckpts/InternVL3-2B_gangnam_rwf2000_gj_cctv_scvdALL_NOweapon_no_split"
+                 , device="cuda:0"):
+        
     # def __init__(self, model_path="ckpts/merge_result", device="cuda:0"):
     # def __init__(self, model_path="ckpts/InternVL3-2B", device="cuda:0"):
     
@@ -128,7 +131,8 @@ class InternVL3Inferencer:
 # 전역 변수들
 current_video_reader = None
 current_video_path = None
-inferencer = None
+# inferencer = None
+inferencer = InternVL3Inferencer()
 
 def load_video_for_display(video_path):
     """비디오를 로드하고 전역 변수에 저장"""

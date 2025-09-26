@@ -554,9 +554,13 @@ class LazySupervisedDataset(Dataset):
         elif video_type == "aihub_store":
             min_num_frames, max_num_frames = 1, 20
         elif video_type == "ai_hub_spaces":
-            min_num_frames, max_num_frames = 12, 24
+            min_num_frames, max_num_frames = 12, 12
         elif video_type == "gj":
             min_num_frames, max_num_frames = 12, 12
+        elif video_type == "cctv":
+            min_num_frames, max_num_frames = 12, 12 
+        elif video_type == "scvd":
+            min_num_frames, max_num_frames = 1, 12 
 
         if 'sampled_frames' in data_item.keys():
             sampled_frames = data_item['sampled_frames']

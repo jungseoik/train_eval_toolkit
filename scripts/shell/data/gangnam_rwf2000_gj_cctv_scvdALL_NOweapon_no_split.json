@@ -1,0 +1,38 @@
+{
+    "GangNam": {
+      "root": "data/",
+      "annotation": "data/instruction/train/train_gangnam_rwf2000.jsonl",
+      "data_augment": false,
+      "repeat_time": 1,
+      "length": 2727
+    },
+    "GJ_NO_SPLIT": {
+      "root": "data/",
+      "annotation": "data/instruction/train/train_gj_no_split.jsonl",
+      "data_augment": false,
+      "repeat_time": 1,
+      "length": 1158
+    },
+    "RWF2000_NO_SPLIT": {
+      "root": "data/",
+      "annotation": "data/instruction/train/train_rwf2000_no_split.jsonl",
+      "data_augment": false,
+      "repeat_time": 1,
+      "length": 1999
+    },
+    "CCTV_NO_SPLIT": {
+      "root": "data/",
+      "annotation": "data/instruction/train/train_cctv_no_split.jsonl",
+      "data_augment": false,
+      "repeat_time": 1,
+      "length": 33374
+    }
+    ,
+    "SCVD_ALL_NO_WEAPON": {
+      "root": "data/",
+      "annotation": "data/instruction/train/train_scvdALL_NOweapon.jsonl",
+      "data_augment": false,
+      "repeat_time": 1,
+      "length": 2141
+    }
+}

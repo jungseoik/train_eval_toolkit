@@ -35,17 +35,22 @@ Example (normal):
 """
 
 
-def create_final_dataset(root_dir: str, base_dir:str = "data/") -> list:
+# --- 💡 수정된 부분: mode 파라미터 추가 ---
+def create_final_dataset(root_dir: str, base_dir:str = "data/", mode: str = "train") -> list:
     """
     pathlib을 사용해 지정된 디렉토리와 모든 하위 디렉토리에서 JSON 파일을 재귀적으로 찾아
     요청된 최종 데이터셋 구조로 변환합니다.
+    
+    Args:
+        root_dir (str): JSON과 비디오 파일이 있는 루트 디렉토리.
+        base_dir (str): 상대 경로 계산을 위한 기준 디렉토리.
+        mode (str): 처리 모드 ('train' 또는 'test'). 
+                     'test' 모드에서는 human 프롬프트를 제외합니다.
     """
     final_dataset = []
     current_id = 0
     
-    # 파일 검색 경로는 기존과 동일
     search_path = Path(root_dir)
-    # 2. 상대 경로 계산을 위한 기준 경로를 새로 정의
     base_path = Path(base_dir)
     root_path = Path(root_dir)
 
@@ -53,7 +58,7 @@ def create_final_dataset(root_dir: str, base_dir:str = "data/") -> list:
         print(f"오류: 디렉토리 '{root_dir}'를 찾을 수 없습니다.")
         return []
 
-    print(f"'{root_dir}' 디렉토리에서 JSON 파일 탐색을 시작합니다...")
+    print(f"'{root_dir}' 디렉토리에서 JSON 파일 탐색을 시작합니다... (모드: {mode})")
     
     json_files = list(root_path.rglob('*.json'))
     
@@ -62,56 +67,37 @@ def create_final_dataset(root_dir: str, base_dir:str = "data/") -> list:
             with open(json_path_obj, 'r', encoding='utf-8') as f:
                 data = json.load(f)
 
-            # --- 수정된 부분 시작 ---
-
             category = None
             description = None
 
-            # 1. data가 딕셔너리 형태일 경우 (기존 구조)
             if isinstance(data, dict):
                 category = data.get("category")
                 description = data.get("description")
             
-            # 2. data가 리스트 형태일 경우 (en_caption이 있는 구조)
-            elif isinstance(data, list) and data:  # 리스트이고 비어있지 않은지 확인
+            elif isinstance(data, list) and data:
                 first_item = data[0]
                 if isinstance(first_item, dict):
                     category = first_item.get("category")
-                    description = first_item.get("eng_caption") or first_item.get("en_caption") # 'en_caption' 키에서 설명 추출
-            
-            # --- 수정된 부분 끝 ---
+                    description = first_item.get("eng_caption") or first_item.get("en_caption")
 
             if category is None or description is None:
                 print(f"경고: '{json_path_obj}'에 필수 키가 없어 건너뜁니다.")
                 continue
 
-            # video_stem = json_path_obj.stem
-            # video_filename = f"{video_stem}.mp4"
-            # video_path = json_path_obj.with_name(video_filename)
-            # --- 💡 수정된 부분 시작 💡 ---
-            
             video_stem = json_path_obj.stem
             video_path = None
             
-            # JSON 파일과 동일한 이름(stem)을 가진 모든 파일을 찾음
-            # 예: 'video1.json' -> 'video1.*' (video1.mp4, video1.mov 등)
             possible_files = list(json_path_obj.parent.glob(f"{video_stem}.*"))
 
             for file in possible_files:
-                # 찾은 파일 중, 확장자가 .json이 아닌 첫 번째 파일이 비디오 파일임
                 if file.suffix.lower() != '.json':
                     video_path = file
-                    break # 비디오 파일을 찾았으므로 반복 중단
+                    break 
 
-            # 만약 해당하는 비디오 파일을 찾지 못했다면, 이 JSON 파일은 건너뜀
             if not video_path:
                 print(f"경고: '{json_path_obj}'에 해당하는 비디오 파일을 찾을 수 없습니다. 건너뜁니다.")
                 continue
             
-            # --- 💡 수정된 부분 끝 💡 ---
-            
-            
-            # video_relative_path = video_path.relative_to(root_path).as_posix()
             video_relative_path = video_path.relative_to(base_path).as_posix()
             gpt_value_dict = {
                 "category": category,
@@ -119,15 +105,24 @@ def create_final_dataset(root_dir: str, base_dir:str = "data/") -> list:
             }
             gpt_value_string = json.dumps(gpt_value_dict, ensure_ascii=False)
 
+            # --- 💡 추가된 부분 시작: mode에 따라 conversations 구조를 다르게 설정 ---
+            conversations = []
+            if mode == "test":
+                # 'test' 모드일 경우 'gpt' 부분만 추가
+                conversations.append({"from": "gpt", "value": gpt_value_string})
+            else:
+                # 기본('train') 모드일 경우 기존과 동일하게 'human'과 'gpt' 모두 추가
+                conversations.append({"from": "human", "value": HUMAN_PROMPT_VALUE})
+                conversations.append({"from": "gpt", "value": gpt_value_string})
+            # --- 💡 추가된 부분 끝 ---
+
             item = {
                 "id": current_id,
                 "type": "clip",
                 "task": "caption",
                 "video": video_relative_path,
-                "conversations": [
-                    {"from": "human", "value": HUMAN_PROMPT_VALUE},
-                    {"from": "gpt", "value": gpt_value_string}
-                ]
+                # 'conversations' 키에 위에서 생성한 리스트를 할당
+                "conversations": conversations
             }
             final_dataset.append(item)
             current_id += 1
@@ -138,14 +133,15 @@ def create_final_dataset(root_dir: str, base_dir:str = "data/") -> list:
             print(f"오류: '{json_path_obj}' 처리 중 예외 발생: {e}")
 
     return final_dataset
-def label_to_jsonl_result_save(input_dir, output_file_path, base_dir = "data/"):
-    my_dataset = create_final_dataset(input_dir, base_dir)
+
+# --- 💡 수정된 부분: mode 파라미터 추가 ---
+def label_to_jsonl_result_save(input_dir, output_file_path, mode="train", base_dir="data/" ):
+    # create_final_dataset 함수 호출 시 mode 인자 전달
+    my_dataset = create_final_dataset(input_dir, base_dir, mode=mode)
     if my_dataset:
-            # ❗️ 생성된 데이터셋을 .jsonl 형식으로 저장
             try:
                 with open(output_file_path, 'w', encoding='utf-8') as f:
                     for entry in tqdm(my_dataset, desc="JSONL 파일 저장 중"):
-                        # 각 딕셔너리를 JSON 문자열로 변환하고 줄바꿈 문자를 추가하여 파일에 쓴다.
                         f.write(json.dumps(entry, ensure_ascii=False) + '\n')
                 
                 print(f"\n✅ 처리 완료! 총 {len(my_dataset)}개의 항목을 '{output_file_path}' 파일에 저장했습니다.")
@@ -156,10 +152,15 @@ def label_to_jsonl_result_save(input_dir, output_file_path, base_dir = "data/"):
 
 # --- 스크립트를 직접 실행할 때 사용되는 부분 ---
 if __name__ == '__main__':
-    # ❗️ 여기에 실제 데이터가 있는 상위 폴더 경로를 입력하세요.
-
     input_directory = "data"  
     output_file_path = "final_dataset.jsonl"
-    label_to_jsonl_result_save(input_directory , output_file_path)
+    
+    # --- 💡 추가된 부분: 처리 모드 설정 ---
+    # 'test'로 설정하면 human 파트가 제외됩니다.
+    # 기존처럼 human 파트를 포함하려면 'train'으로 설정하세요.
+    processing_mode = "test" 
+    
+    # 함수 호출 시 설정한 mode를 전달
+    label_to_jsonl_result_save(input_directory, output_file_path, mode=processing_mode)
 
     

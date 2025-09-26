@@ -1,0 +1,9 @@
+{
+    "RWF2000": {
+      "root": "data/",
+      "annotation": "data/instruction/train/train_rwf2000.jsonl",
+      "data_augment": false,
+      "repeat_time": 1,
+      "length": 1599
+    }
+}

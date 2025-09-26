@@ -1,0 +1,9 @@
+{
+    "AIHUB_SPACE": {
+      "root": "data/",
+      "annotation": "data/instruction/train/train_aihub_space.jsonl",
+      "data_augment": false,
+      "repeat_time": 1,
+      "length": 3539
+    }
+}

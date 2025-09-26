@@ -1,0 +1,9 @@
+{
+    "CCTV_NO_SPLIT": {
+      "root": "data/",
+      "annotation": "data/instruction/train/train_cctv_no_split.jsonl",
+      "data_augment": false,
+      "repeat_time": 1,
+      "length": 33374
+    }
+}
