@@ -2,7 +2,8 @@ import argparse
 import json
 import sys
 from collections import Counter
-from typing import Any, Dict, Iterable, Optional, Union
+from typing import Any, Dict, Iterable, Optional, Union, List
+from pathlib import Path
 
 def remove_human_video_prompts(jsonl_path, output_path=None):
     """
@@ -36,91 +37,194 @@ def remove_human_video_prompts(jsonl_path, output_path=None):
             f.write(json.dumps(obj, ensure_ascii=False) + "\n")
 
     print(f"✅ 저장 완료: {output_path}")
+# ============================================
+# JSONL 분석 함수들
+# ============================================
 
-def safe_loads_json_maybe(val: Union[str, Dict[str, Any], None]) -> Optional[Dict[str, Any]]:
-    """val이 JSON 문자열이면 json.loads, 이미 dict면 그대로 반환, 아니면 None."""
-    if val is None:
-        return None
-    if isinstance(val, dict):
-        return val
-    if isinstance(val, str):
-        s = val.strip()
-        if not s:
-            return None
-        try:
-            obj = json.loads(s)
-            return obj if isinstance(obj, dict) else None
-        except json.JSONDecodeError:
-            return None
-    return None
-
-def extract_gpt_category(item: Dict[str, Any]) -> Optional[str]:
-    """
-    한 레코드에서 마지막 "from":"gpt"의 value를 JSON으로 파싱해 category를 반환.
-    실패 시 None.
-    """
-    conv = item.get("conversations")
-    if not isinstance(conv, list):
-        return None
-
-    gpt_entries = [c for c in conv if isinstance(c, dict) and c.get("from") == "gpt"]
-    if not gpt_entries:
-        return None
-
-    for c in reversed(gpt_entries):  # 마지막 gpt부터 시도
-        value = c.get("value")
-        obj = safe_loads_json_maybe(value)
-        if obj and "category" in obj:
-            return str(obj["category"]).strip().lower()
-    return None
-
-def iter_jsonl(path: str) -> Iterable[Dict[str, Any]]:
-    """JSONL 파일을 줄 단위로 dict로 yield. 잘못된 줄은 경고 후 스킵."""
-    with open(path, "r", encoding="utf-8") as f:
-        for lineno, line in enumerate(f, start=1):
+def load_jsonl(file_path: str) -> List[Dict[str, Any]]:
+    """JSONL 파일을 읽어서 dict 리스트로 반환"""
+    data = []
+    with open(file_path, 'r', encoding='utf-8') as f:
+        for line_no, line in enumerate(f, 1):
             line = line.strip()
             if not line:
                 continue
             try:
-                obj = json.loads(line)
-                if isinstance(obj, dict):
-                    yield lineno, obj
-                else:
-                    print(f"[경고] {lineno}행: dict가 아닌 JSON - 스킵", file=sys.stderr)
+                data.append(json.loads(line))
             except json.JSONDecodeError as e:
-                print(f"[경고] {lineno}행 JSON 파싱 실패: {e} - 스킵", file=sys.stderr)
+                print(f"⚠️  Line {line_no}: JSON 파싱 실패 - {e}")
+    return data
 
-def main():
-    ap = argparse.ArgumentParser(description="JSONL의 GPT category(violence/normal) 비율 집계")
-    ap.add_argument("jsonl_path", help="입력 JSONL 파일 경로")
-    ap.add_argument("--verbose", action="store_true", help="스킵/이상치 상세 로그 출력")
-    args = ap.parse_args()
 
-    counts = Counter()
-    total_valid = 0
-    skipped = 0
+def parse_json_value(value: Any) -> Optional[Dict[str, Any]]:
+    """문자열을 JSON으로 파싱, 이미 dict면 그대로 반환"""
+    if isinstance(value, dict):
+        return value
+    
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value.strip())
+            return parsed if isinstance(parsed, dict) else None
+        except (json.JSONDecodeError, AttributeError):
+            return None
+    
+    return None
 
-    for lineno, item in iter_jsonl(args.jsonl_path):
-        cat = extract_gpt_category(item)
-        if cat in ("violence", "normal"):
-            counts[cat] += 1
-            total_valid += 1
-        else:
-            skipped += 1
-            if args.verbose:
-                print(f"[스킵] {lineno}행: category 없음/파싱 실패/정의 외 값", file=sys.stderr)
 
-    # 콘솔 요약 출력
-    print("\n=== Category Composition ===")
-    print(f"총 유효 샘플: {total_valid}")
-    for cat in ("violence", "normal"):
-        n = counts.get(cat, 0)
-        pct = (n / total_valid * 100.0) if total_valid > 0 else 0.0
-        print(f"- {cat:8s}: {n:6d}  ({pct:6.2f}%)")
-    print(f"기타/누락(파싱 실패·정의 외 값): {skipped}\n")
+def extract_category(item: Dict[str, Any]) -> Optional[str]:
+    """
+    한 레코드에서 마지막 gpt 응답의 category 추출
+    
+    Returns:
+        category 문자열 (소문자) 또는 None
+    """
+    conversations = item.get('conversations')
+    if not isinstance(conversations, list):
+        return None
+    
+    gpt_messages = [
+        msg for msg in conversations 
+        if isinstance(msg, dict) and msg.get('from') == 'gpt'
+    ]
+    
+    if not gpt_messages:
+        return None
+    
+    # 마지막 gpt 메시지부터 역순으로 탐색
+    for msg in reversed(gpt_messages):
+        parsed = parse_json_value(msg.get('value'))
+        if parsed and 'category' in parsed:
+            return str(parsed['category']).strip().lower()
+    
+    return None
+
+
+def get_category_distribution(data: List[Dict[str, Any]]) -> Dict[str, int]:
+    """데이터셋의 category 분포 집계"""
+    categories = []
+    
+    for item in data:
+        cat = extract_category(item)
+        if cat:
+            categories.append(cat)
+    
+    return dict(Counter(categories))
+
+
+def _print_single_stats(file_path: str, stats: Dict[str, int], total: int) -> None:
+    """단일 파일의 통계 출력 (내부 헬퍼 함수)"""
+    valid_count = sum(stats.values())
+    
+    print(f"\n📄 {Path(file_path).name}")
+    print(f"{'─'*60}")
+    print(f"  총 샘플: {total:,}개  |  유효: {valid_count:,}개")
+    print(f"{'─'*60}")
+    
+    # 모든 카테고리 출력 (빈도순)
+    for cat, count in sorted(stats.items(), key=lambda x: x[1], reverse=True):
+        pct = (count / valid_count * 100) if valid_count > 0 else 0
+        print(f"    {cat:15s}: {count:7,}개  ({pct:6.2f}%)")
+    
+    # 누락된 샘플
+    missing = total - valid_count
+    if missing > 0:
+        print(f"  ⚠️  Category 누락: {missing:,}개")
+
+
+def print_dataset_info(file_paths: Union[str, List[str]]) -> None:
+    """
+    JSONL 데이터셋의 정보 출력
+    
+    Args:
+        file_paths: JSONL 파일 경로 (단일 문자열 또는 리스트)
+    """
+    # 단일 파일을 리스트로 변환
+    if isinstance(file_paths, str):
+        file_paths = [file_paths]
+    
+    print(f"\n{'='*60}")
+    print(f"📊 Dataset Analysis")
+    print(f"{'='*60}")
+    
+    # 각 파일별 데이터 수집
+    all_data = []
+    file_stats = []
+    
+    for file_path in file_paths:
+        data = load_jsonl(file_path)
+        stats = get_category_distribution(data)
+        
+        all_data.extend(data)
+        file_stats.append({
+            'path': file_path,
+            'data': data,
+            'stats': stats,
+            'total': len(data)
+        })
+    
+    # 1. 개별 파일 정보 출력
+    if len(file_paths) > 1:
+        print(f"\n[ 개별 파일 정보 ]")
+        for fs in file_stats:
+            _print_single_stats(fs['path'], fs['stats'], fs['total'])
+    
+    # 2. 전체 통합 정보 출력
+    if len(file_paths) > 1:
+        print(f"\n{'='*60}")
+        print(f"📊 전체 통합 통계")
+        print(f"{'='*60}")
+    
+    total_samples = len(all_data)
+    total_stats = get_category_distribution(all_data)
+    valid_count = sum(total_stats.values())
+    
+    print(f"\n총 파일 수: {len(file_paths)}개")
+    print(f"총 샘플 수: {total_samples:,}개")
+    print(f"유효 샘플: {valid_count:,}개")
+    
+    print(f"\n{'─'*60}")
+    print(f"Category 분포")
+    print(f"{'─'*60}")
+    
+    # 모든 카테고리 출력 (빈도순)
+    for cat, count in sorted(total_stats.items(), key=lambda x: x[1], reverse=True):
+        pct = (count / valid_count * 100) if valid_count > 0 else 0
+        print(f"  {cat:15s}: {count:7,}개  ({pct:6.2f}%)")
+    
+    # 누락된 샘플
+    missing = total_samples - valid_count
+    if missing > 0:
+        print(f"\n⚠️  Category 누락: {missing:,}개")
+    
+    print(f"{'='*60}\n")
+
+
+def get_dataset_summary(file_path: str) -> Dict[str, Any]:
+    """
+    데이터셋 요약 정보를 dict로 반환
+    
+    Returns:
+        {
+            'total_samples': int,
+            'valid_samples': int,
+            'missing_samples': int,
+            'categories': {'category': count, ...}
+        }
+    """
+    data = load_jsonl(file_path)
+    stats = get_category_distribution(data)
+    
+    total = len(data)
+    valid = sum(stats.values())
+    
+    return {
+        'total_samples': total,
+        'valid_samples': valid,
+        'missing_samples': total - valid,
+        'categories': stats
+    }
+
 
 if __name__ == "__main__":
-    
-    remove_human_video_prompts("data/instruction/evaluation/test_rwf2000.jsonl")
-    # main()
-    # python src/utils/jsonl_inform_check.py configs/instruction/exper000.jsonl
+    print_dataset_info("data/instruction/train/train_abb_vqa.jsonl")
+    # remove_human_video_prompts("data/instruction/train/train_abb_vqa_train.jsonl")

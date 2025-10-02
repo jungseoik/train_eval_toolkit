@@ -64,3 +64,4 @@ PYTHONPATH="$(pwd)" torchrun --nproc_per_node=4 src/evaluation/evaluate_video_cl
     --out-dir results/eval_result \
     --num-frames 12 \
     --workers-per-gpu 16
+

@@ -18,7 +18,11 @@ def run_merge_jsonl(args):
     file2 = args.file2
     output = args.output
     merger.merge_jsonl_files(file1, file2, output)
+from src.utils.jsonl_inform_check import print_dataset_info
+def run_jsonl_inform_check(args):
+    print_dataset_info(args.files)
 
+################################################################################################
 from src.preprocess.gj.gj_split import process_videos_clips
 def run_gj_video_split(args):
     source_dir = args.input_dir
@@ -35,7 +39,7 @@ def run_aihub_store_video_split(args):
     process_videos_clips_aihub_store(args.input_dir, args.output_dir, args.num_processes)
 from src.preprocess.label2jsonl import label_to_jsonl_result_save
 def run_label_to_jsonl(args):
-    label_to_jsonl_result_save(args.input_dir, args.output_file, args.option)
+    label_to_jsonl_result_save(args.input_dir, args.output_file, args.option , args.data_type)
 
 def run_preprocess(args): # 이제 각 함수는 args를 받을 수 있습니다.
     """전처리 프로세스를 실행합니다."""
@@ -116,8 +120,20 @@ if __name__ == '__main__':
                             help='Location of jsonl file to save') 
     parser_label_to_jsonl.add_argument('-opt', '--option', default="train", type=str, required=False,
                             help='train or test extract mode select') 
-    
+    parser_label_to_jsonl.add_argument('-dt', '--data_type', default="video", type=str, required=False,
+                            help='image or video type select') 
+
     parser_label_to_jsonl.set_defaults(func=run_label_to_jsonl)    
+    
+    # --- 'jsonl_information_check' 서브 파서 ---
+    # remove_human_video_prompts("data/instruction/evaluation/test_rwf2000.jsonl")
+    parser_json_inform_check = subparsers.add_parser('jsonl_inform_check', help="jsonl information check")
+    parser_json_inform_check.add_argument('-i', "--files",nargs='+', help='분석할 JSONL 파일 경로 (여러 개 가능)', required=True)
+
+    parser_json_inform_check.set_defaults(func=run_jsonl_inform_check)    
+
+    ####################################################################################################################################
+
 
     # --- 'gj_split_video' 서브 파서 ---
     parser_gj_split = subparsers.add_parser('gj_split', help="split video ,Only gang-jin labeling format")

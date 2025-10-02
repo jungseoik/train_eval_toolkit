@@ -18,20 +18,17 @@ import time
 
 def process_single_video(args_tuple):
     """단일 비디오 파일 처리"""
-    video_path, output_base_dir = args_tuple
+    video_path, output_base_dir, input_base_dir = args_tuple  # input_base_dir 추가
     
     try:
         video_path = Path(video_path)
         output_base_dir = Path(output_base_dir)
+        input_base_dir = Path(input_base_dir)  # 추가
         
         print(f"🔄 처리 시작: {video_path.name}")
         
-        # 경로에서 마지막 2단계 폴더 추출
-        # 예: /data/raw/ai_hub_cctv/normal/ai_hub_cctv_normal/file.mp4
-        # -> normal/ai_hub_cctv_normal
-        parent_dir = video_path.parent.name
-        grandparent_dir = video_path.parent.parent.name
-        relative_path = Path(grandparent_dir) / parent_dir
+        # 새로운 코드: input_dir 기준 상대 경로 계산
+        relative_path = video_path.parent.relative_to(input_base_dir)
         
         # 출력 디렉토리 생성
         target_dir = output_base_dir / relative_path
@@ -151,8 +148,8 @@ def main():
     print(f"📊 발견된 비디오 파일: {len(video_files)}개")
     
     # 처리할 인자 준비
-    process_args = [(video_path, str(output_dir)) for video_path in video_files]
-    
+    # process_args = [(video_path, str(output_dir)) for video_path in video_files]
+    process_args = [(video_path, str(output_dir), str(input_dir)) for video_path in video_files]
     # 시작 시간 기록
     start_time = time.time()
     
@@ -187,4 +184,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    # python encoding.py data/raw/ai_hub_cctv data/raw/ai_hub_cctv_encoding -j 128
+    # python encoding.py results/eval_quality_gangnam/video_quality/yeoksam2st/falldown results/eval_quality_encoding/GangNam/yeoksam2st/falldown -j 64

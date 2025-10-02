@@ -10,7 +10,7 @@ import glob
 import multiprocessing as mp
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
-
+import decord
 # ---------------- 공유 유틸/모델 (1단계 코드에서 가져온 것 + 일부 확장) ----------------
 import torch
 from transformers import AutoModel, AutoTokenizer
@@ -93,20 +93,19 @@ def get_indices_by_frame_range(start_idx: int, end_idx: int, num_segments: int) 
     idxs = [min(max(start, x), end) for x in idxs]
     return np.array(idxs, dtype=int)
 
+
+
 def load_video_window(video_path: str,
                       start_frame: int,
                       end_frame: int,
                       input_size: int = 448,
                       max_num: int = 1,
                       num_segments: int = 12):
-    """
-    주어진 프레임 범위[start_frame, end_frame]에서 num_segments만큼만 샘플링해
-    InternVL 입력 텐서를 만듭니다. (윈도우만 디코딩)
-    """
     vr = build_video_reader(video_path)
     max_frame = len(vr) - 1
     s = max(0, min(start_frame, max_frame))
     e = max(0, min(end_frame, max_frame))
+
     indices = get_indices_by_frame_range(s, e, num_segments=num_segments)
 
     pixel_values_list, num_patches_list = [], []
@@ -119,7 +118,10 @@ def load_video_window(video_path: str,
         num_patches_list.append(pixel_values.shape[0])
         pixel_values_list.append(pixel_values)
     pixel_values = torch.cat(pixel_values_list)
-    return pixel_values, num_patches_list
+
+    # ★ 샘플된 프레임 인덱스까지 함께 반환
+    return pixel_values, num_patches_list, indices
+
 
 class InternVL3Inferencer:
     def __init__(self, model_path="OpenGVLab/InternVL3-2B", device="cuda:0"):
@@ -143,15 +145,17 @@ class InternVL3Inferencer:
                      start_frame: int,
                      end_frame: int,
                      num_segments: int = 12,
-                     input_size: int = 448) -> str:
-        pixel_values, num_patches_list = load_video_window(
+                     input_size: int = 448) -> Tuple[str, np.ndarray]:
+        # ★ indices 함께 받기
+        pixel_values, num_patches_list, indices = load_video_window(
             video_path, start_frame, end_frame, input_size=input_size, max_num=1, num_segments=num_segments
         )
         pixel_values = pixel_values.to(torch.bfloat16).cuda()
         video_prefix = ''.join([f'Frame{i+1}: <image>\n' for i in range(len(num_patches_list))])
         question = video_prefix + prompt
         response = self.model.chat(self.tokenizer, pixel_values, question, self.generation_config)
-        return response
+        # ★ 응답과 인덱스 동시 반환
+        return response, indices
 
 # ---------------- 파서 (사용자 제공 로직 그대로) ----------------
 # def parse_prediction(pred_str: str) -> str:
@@ -287,8 +291,10 @@ def model_worker_main(gpu_id: int, ctrl_q: mp.Queue, resp_q: mp.Queue, model_pat
             err = None
             raw = ""
             label = "violence"
+
             try:
-                raw = inferencer.infer_window(
+                # ★ 응답과 indices를 함께 받음
+                raw, sampled_indices = inferencer.infer_window(
                     video_path=video_path,
                     prompt=prompt,
                     start_frame=start_frame,
@@ -297,20 +303,10 @@ def model_worker_main(gpu_id: int, ctrl_q: mp.Queue, resp_q: mp.Queue, model_pat
                     input_size=input_size,
                 )
                 label = parse_prediction(raw)
-            # except Exception as e:
-            #     ok = False
-            #     err = repr(e)
             except Exception as e:
-                # ---↓ 에러를 터미널에 직접 출력하는 코드 추가 ↓---
-                print(f"\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-                print(f"!!! INFERENCE ERROR on '{video_path}' (frames {start_frame}-{end_frame})")
-                print(f"!!! ERROR: {e}")
-                print(f"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n")
-                # ---↑-----------------------------------------↑---
-                ok = False
-                err = repr(e)
-                
-                
+                ...
+                raw = ""
+                sampled_indices = []  # 실패 시 빈값
             resp_q.put({
                 "type": "infer_result",
                 "pid": os.getpid(),
@@ -323,8 +319,9 @@ def model_worker_main(gpu_id: int, ctrl_q: mp.Queue, resp_q: mp.Queue, model_pat
                 "label": label if ok else "violence",
                 "raw": raw if ok else "",
                 "error": err,
+                # ★ 샘플된 실제 프레임 인덱스 포함
+                "sampled_indices": list(map(int, sampled_indices)) if sampled_indices is not None else [],
             })
-
         else:
             resp_q.put({"type": "error", "pid": os.getpid(), "gpu_id": gpu_id, "device": device_str, "error": f"unknown op: {op}"})
 
@@ -465,6 +462,9 @@ def run_inference(
     - 각 비디오는 window_size로 나눠 infer → 윈도우 레이블을 프레임 전체에 전파 → CSV 저장
     - 진행률 출력(전체/개별)
     """
+    # ★ 로그 디렉토리 준비
+    logs_dir = os.path.join(csv_save_dir, "logs")
+    ensure_dir(logs_dir)
     print("[STEP] 모델 풀 시작")
     handles = start_model_pool(gpu_to_nproc, model_path=model_path)
 
@@ -501,7 +501,7 @@ def run_inference(
     # 프레임 단위 violence 라벨(0/1) 초기화
     per_video_frame_labels = {vp: [0] * video_frames[vp] for vp in videos}
 
-    # <<< -------------------- 여기를 추가하세요 -------------------- >>>
+    # <<< ---------------   ----- 여기를 추가하세요 -------------------- >>>
     per_video_frame_raws = {vp: [""] * video_frames[vp] for vp in videos}
     # <<< ----------------------------------------------------------- >>>
 
@@ -544,16 +544,36 @@ def run_inference(
 
             typ = msg.get("type")
 
+
             if typ == "infer_result":
                 vp = msg["video_path"]
                 s = msg["start_frame"]
                 e = msg["end_frame"]
                 ok = msg["ok"]
                 label = msg.get("label", "violence")
-                # <<< -------------------- 여기를 추가하세요 -------------------- >>>
                 raw_text = msg.get("raw", "")
-                # <<< ----------------------------------------------------------- >>>
+                sampled_indices = msg.get("sampled_indices", [])
+                elapsed = msg.get("elapsed", None)
 
+                # ★ per-video 로그 파일 경로
+                base = os.path.splitext(os.path.basename(vp))[0]
+                log_path = os.path.join(logs_dir, f"{base}.jsonl")
+
+                # ★ JSONL 레코드 구성 (프레임 구간/실제 입력 인덱스/결과/원문/소요시간)
+                log_rec = {
+                    "video": vp,
+                    "window_start": s,
+                    "window_end": e,
+                    "sampled_indices": sampled_indices,
+                    "ok": ok,
+                    "label": label,
+                    "elapsed_sec": elapsed,
+                    "raw": raw_text,
+                    "ts": time.time()
+                }
+                # ★ 파일에 append (UTF-8, 한 줄 한 레코드)
+                with open(log_path, "a", encoding="utf-8") as lf:
+                    lf.write(json.dumps(log_rec, ensure_ascii=False) + "\n")
                 # 라벨 적용: violence → 1, normal → 0
                 vflag = 1 if label == "violence" else 0
                 for idx in range(s, e + 1):
@@ -624,51 +644,27 @@ if __name__ == "__main__":
     """
     VIDEO_DIR = "/home/piawsa6000/nas192/datasets/projects/huggingface_benchmarks_dataset/Leaderboard_bench/PIA_Violence/dataset/violence"         # a6000
     VIDEO_DIR = "/mnt/nas_192/datasets/projects/huggingface_benchmarks_dataset/Leaderboard_bench/PIA_Violence/dataset/violence"         # h100
-    # VIDEO_DIR = "data/test/test2"         # h100
+    VIDEO_DIR = "data/test/test2"         # h100
 
     CSV_DIR   = "results/eval_hf_result/InternVL3-2B_gangnam_vietnam_aihubstore_gj_space_no_split"       # CSV 저장 폴더
     CSV_DIR   = "results/eval_hf_result/InternVL3-2B_gangnam_rwf2000_gj_cctv_scvdALL_NOweapon_no_split"
-    CSV_DIR   = "results/eval_test/test7"
+    CSV_DIR   = "results/eval_test/test7" 
+
+
+
+    
 
     WINDOW    = 12                        # 윈도우 크기(프레임 개수)
-    # PROMPT    = """
-    # Watch this short video clip and respond with exactly one JSON object.\n\n[Rules]\n- The category must be either 'violence' or 'normal'.  \n- Classify as violence if any of the following actions are present:  \n  * Punching  \n  * Kicking  \n  * Weapon Threat\n  * Weapon Attack\n  * Falling/Takedown  \n  * Pushing/Shoving  \n  * Brawling/Group Fight  \n- If none of the above are observed, classify as normal.  \n- The following cases must always be classified as normal:  \n  * Affection (hugging, holding hands, light touches)  \n  * Helping (supporting, assisting)  \n  * Accidental (unintentional bumping)  \n  * Playful (non-aggressive playful contact)  \n\n[Output Format]\n- Output exactly one JSON object.  \n- The object must contain only two keys: \"category\" and \"description\".  \n- The description should briefly and objectively describe the scene.  \n\nExample (violence):  \n{\"category\":\"violence\",\"description\":\"A man in a black jacket punches another man, who stumbles backward.\"}\n\nExample (normal):  \n{\"category\":\"normal\",\"description\":\"Two people are hugging inside an elevator
-    # """
-    PROMPT  = """
-Watch this short video clip (1–2 seconds) and respond with exactly one JSON object.
-
-[Rules]
-- The category must be either 'violence' or 'normal'.
-- Classify as violence if any of the following actions are present:
-  * Punching
-  * Kicking
-  * Weapon Threat
-  * Weapon Attack
-  * Falling/Takedown
-  * Pushing/Shoving
-  * Brawling/Group Fight
-- If none of the above are observed, classify as normal.
-- The following cases must always be classified as normal:
-  * Affection (hugging, holding hands, light touches)
-  * Helping (supporting, assisting)
-  * Accidental (unintentional bumping)
-  * Playful (non-aggressive playful contact)
-
-[Output Format]
-- Output exactly one JSON object.
-- The object must contain only two keys: "category" and "description".
-- The description should briefly and objectively describe the scene.
-
-Example (violence):
-{"category":"violence","description":"A man in a black jacket punches another man, who stumbles backward."}
-
-Example (normal):
-{"category":"normal","description":"Two people are hugging inside an elevator"}
-"""
+    PROMPT    = """
+    Watch this short video clip and respond with exactly one JSON object.\n\n[Rules]\n- The category must be either 'violence' or 'normal'.  \n- Classify as violence if any of the following actions are present:  \n  * Punching  \n  * Kicking  \n  * Weapon Threat\n  * Weapon Attack\n  * Falling/Takedown  \n  * Pushing/Shoving  \n  * Brawling/Group Fight  \n- If none of the above are observed, classify as normal.  \n- The following cases must always be classified as normal:  \n  * Affection (hugging, holding hands, light touches)  \n  * Helping (supporting, assisting)  \n  * Accidental (unintentional bumping)  \n  * Playful (non-aggressive playful contact)  \n\n[Output Format]\n- Output exactly one JSON object.  \n- The object must contain only two keys: \"category\" and \"description\".  \n- The description should briefly and objectively describe the scene.  \n\nExample (violence):  \n{\"category\":\"violence\",\"description\":\"A man in a black jacket punches another man, who stumbles backward.\"}\n\nExample (normal):  \n{\"category\":\"normal\",\"description\":\"Two people are hugging inside an elevator
+    """
     GPU_PROC  = {0:8, 1:8, 2:8, 3:8}                    # GPU0에 프로세스 2개
+    # GPU_PROC  = {0:4}                    # GPU0에 프로세스 2개
+
     MODEL_ID  = "ckpts/InternVL3-2B_gangnam_vietnam_rwf2000_aihubstore_gj_space_no_split"
     MODEL_ID  = "ckpts/InternVL3-2B"
     MODEL_ID  = "ckpts/InternVL3-2B_gangnam_rwf2000_gj_cctv_scvdALL_NOweapon_no_split"
+    # MODEL_ID  = "ckpts/PIA_Violence"
 
     
     run_inference(
@@ -682,3 +678,14 @@ Example (normal):
         input_size=448,
     )
 
+
+# export OMP_NUM_THREADS=1
+# export MKL_NUM_THREADS=1
+# CUDA_VISIBLE_DEVICES=0,1 \
+# PYTHONPATH="$(pwd)" torchrun --nproc_per_node=2 src/evaluation/evaluate_pia_hf_bench_eff.py \
+#     --checkpoint ckpts/InternVL3-2B_gangnam_vietnam_aihubstore_gj_space_no_split \
+#     --video-root /home/piawsa6000/nas192/datasets/projects/huggingface_benchmarks_dataset/Leaderboard_bench/PIA_Violence/dataset/violence \
+#     --out-dir results/eval_hf_result/InternVL3-2B_gangnam_vietnam_aihubstore_gj_space_no_split \
+#     --window-size 15 \
+#     --workers-per-gpu 0 \
+#     --procs-per-gpu 4

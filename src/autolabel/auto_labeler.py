@@ -36,11 +36,7 @@ def _label_single_video(
         output_folder = os.path.dirname(video_path)
         base_filename = os.path.splitext(os.path.basename(video_path))[0]
         output_filepath = os.path.join(output_folder, f"{base_filename}.json")
-        
-        # --- 이미 결과 파일이 존재하면 건너뛰는 로직 ---
-        # if os.path.exists(output_filepath):
-        #     print(f"⏩ Skipping: Label file already exists for {os.path.basename(video_path)}")
-        #     return output_filepath # 이미 성공한 것으로 간주하고 경로 반환
+
         if os.path.exists(output_filepath):
             try:
                 with open(output_filepath, 'r', encoding='utf-8') as f:

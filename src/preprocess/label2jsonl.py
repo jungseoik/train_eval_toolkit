@@ -33,10 +33,39 @@ Example (violence):
 Example (normal):  
 {"category":"normal","description":"Two people are hugging inside an elevator."}
 """
+HUMAN_PROMPT_VALUE_FALLDOWN = """<image>
+Analyze this image carefully. Determine if a person has fallen down.
+
+Important classification rules:
+
+- The "falldown" category applies to any person who is lying down, regardless of:
+  - the surface (e.g., floor, mattress, bed)
+  - the posture (natural or unnatural)
+  - the cause (e.g., sleeping, collapsing, lying intentionally)
+- This includes:
+  - A person lying flat on the ground or other surfaces
+  - A person collapsed or sprawled in any lying position
+- The "normal" category applies only if the person is:
+  - sitting
+  - standing
+  - kneeling
+  - or otherwise upright (not lying down)
+
+Answer in JSON format with BOTH of the following fields:
+- "category": either "falldown" or "normal"
+- "description": a brief reason why this classification was made (e.g., "person lying on a mattress", "person sitting on sofa")
+
+Example:
+{ 
+  "category": "falldown", 
+  "description": "person lying on a mattress in natural posture" 
+}
+"""
 
 
-# --- 💡 수정된 부분: mode 파라미터 추가 ---
-def create_final_dataset(root_dir: str, base_dir:str = "data/", mode: str = "train") -> list:
+
+def create_final_dataset(root_dir: str, base_dir:str = "data/", mode: str = "train",
+                         data_type: str = "video") -> list:
     """
     pathlib을 사용해 지정된 디렉토리와 모든 하위 디렉토리에서 JSON 파일을 재귀적으로 찾아
     요청된 최종 데이터셋 구조로 변환합니다.
@@ -44,8 +73,8 @@ def create_final_dataset(root_dir: str, base_dir:str = "data/", mode: str = "tra
     Args:
         root_dir (str): JSON과 비디오 파일이 있는 루트 디렉토리.
         base_dir (str): 상대 경로 계산을 위한 기준 디렉토리.
-        mode (str): 처리 모드 ('train' 또는 'test'). 
-                     'test' 모드에서는 human 프롬프트를 제외합니다.
+        mode (str): 처리 모드 ('train' 또는 'test'). 'test' 모드에서는 human 프롬프트를 제외합니다.
+        data_type (str): 'video' 또는 'image' 선택
     """
     final_dataset = []
     current_id = 0
@@ -85,20 +114,28 @@ def create_final_dataset(root_dir: str, base_dir:str = "data/", mode: str = "tra
                 continue
 
             video_stem = json_path_obj.stem
-            video_path = None
+            # video_path = None
             
             possible_files = list(json_path_obj.parent.glob(f"{video_stem}.*"))
-
+            media_path = None
+            
             for file in possible_files:
                 if file.suffix.lower() != '.json':
-                    video_path = file
-                    break 
+                    if data_type == "video" and file.suffix.lower() in [".mp4", ".avi", ".mov", ".mkv"]:
+                        media_path = file
+                        break
+                    elif data_type == "image" and file.suffix.lower() in [".jpg", ".jpeg", ".png", ".bmp", ".webp"]:
+                        media_path = file
+                        break
+                    # video_path = file
+                    # break 
 
-            if not video_path:
+            if not media_path:
                 print(f"경고: '{json_path_obj}'에 해당하는 비디오 파일을 찾을 수 없습니다. 건너뜁니다.")
                 continue
             
-            video_relative_path = video_path.relative_to(base_path).as_posix()
+            # video_relative_path = video_path.relative_to(base_path).as_posix()
+            
             gpt_value_dict = {
                 "category": category,
                 "description": description
@@ -111,19 +148,41 @@ def create_final_dataset(root_dir: str, base_dir:str = "data/", mode: str = "tra
                 # 'test' 모드일 경우 'gpt' 부분만 추가
                 conversations.append({"from": "gpt", "value": gpt_value_string})
             else:
+                if data_type == "video":
                 # 기본('train') 모드일 경우 기존과 동일하게 'human'과 'gpt' 모두 추가
-                conversations.append({"from": "human", "value": HUMAN_PROMPT_VALUE})
-                conversations.append({"from": "gpt", "value": gpt_value_string})
+                    conversations.append({"from": "human", "value": HUMAN_PROMPT_VALUE})
+                    conversations.append({"from": "gpt", "value": gpt_value_string})
+                elif data_type == "image":
+                    conversations.append({"from": "human", "value": HUMAN_PROMPT_VALUE_FALLDOWN})
+                    conversations.append({"from": "gpt", "value": gpt_value_string})
+                    
             # --- 💡 추가된 부분 끝 ---
-
-            item = {
-                "id": current_id,
-                "type": "clip",
-                "task": "caption",
-                "video": video_relative_path,
-                # 'conversations' 키에 위에서 생성한 리스트를 할당
-                "conversations": conversations
-            }
+            media_relative_path = media_path.relative_to(base_path).as_posix()
+            if data_type == "video":
+                item = {
+                    "id": current_id,
+                    "type": "clip",
+                    "task": "caption",
+                    "video": media_relative_path,
+                    "conversations": conversations
+                }
+            elif data_type == "image":
+                item = {
+                    "id": current_id,
+                    "type": "capture_frame",
+                    "task": "caption",
+                    "image": media_relative_path,
+                    "conversations": conversations
+                }
+            
+            # item = {
+            #     "id": current_id,
+            #     "type": "clip",
+            #     "task": "caption",
+            #     "video": video_relative_path,
+            #     # 'conversations' 키에 위에서 생성한 리스트를 할당
+            #     "conversations": conversations
+            # }
             final_dataset.append(item)
             current_id += 1
 
@@ -135,9 +194,9 @@ def create_final_dataset(root_dir: str, base_dir:str = "data/", mode: str = "tra
     return final_dataset
 
 # --- 💡 수정된 부분: mode 파라미터 추가 ---
-def label_to_jsonl_result_save(input_dir, output_file_path, mode="train", base_dir="data/" ):
+def label_to_jsonl_result_save(input_dir, output_file_path, mode="train", data_type="video", base_dir="data/" ):
     # create_final_dataset 함수 호출 시 mode 인자 전달
-    my_dataset = create_final_dataset(input_dir, base_dir, mode=mode)
+    my_dataset = create_final_dataset(input_dir, base_dir, mode=mode, data_type=data_type)
     if my_dataset:
             try:
                 with open(output_file_path, 'w', encoding='utf-8') as f:

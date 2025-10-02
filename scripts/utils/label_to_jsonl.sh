@@ -38,3 +38,20 @@ python main.py label2jsonl -i "data/raw/smartcity_cctv_violence/SCVD/SCVD_conver
 
 ### CCTV
 python main.py label2jsonl -i "data/processed/ai_hub_cctv_encoding" -o "data/instruction/train/train_cctv_no_split.jsonl" 
+
+### ABB falldown
+python main.py label2jsonl -i "data/processed/ABB_banwoldang/PE/Train" -o "data/instruction/train/train_abb_pe.jsonl" -dt "image"
+python main.py label2jsonl -i "data/processed/ABB_banwoldang/VQA/Train" -o "data/instruction/train/train_abb_vqa.jsonl" -dt "image" 
+python main.py label2jsonl -i "data/processed/ABB_banwoldang/PE/Test" -o "data/instruction/train/train_abb_pe_test.jsonl" -dt "image" -opt "test"
+python main.py label2jsonl -i "data/processed/ABB_banwoldang/VQA/Test" -o "data/instruction/train/train_abb_vqa_test.jsonl" -dt "image" -opt "test"
+### 강남 개포1동 
+python main.py label2jsonl -i "data/processed/gangnam/gaepo1/Test_dataset_gaepo1st" -o "data/instruction/evaluation/test_gangnam_gaepo1_falldown.jsonl" -dt "image" -opt "test"
+python main.py label2jsonl -i "data/processed/gangnam/gaepo1/Train_dataset_gaepo1st" -o "data/instruction/train/train_gangnam_gaepo1_falldown.jsonl" -dt "image" 
+python main.py label2jsonl -i "data/processed/gangnam/gaepo1/Test_dataset_gaepo1st" -o "data/instruction/evaluation/test_gangnam_gaepo1_violence.jsonl" -opt "test"
+python main.py label2jsonl -i "data/processed/gangnam/gaepo1/Train_dataset_gaepo1st" -o "data/instruction/train/train_gangnam_gaepo1_violence.jsonl" 
+
+### 강남 역삼2동 
+python main.py label2jsonl -i "data/processed/gangnam/yeoksam2/Test_dataset_yeoksam2st" -o "data/instruction/evaluation/test_gangnam_yeoksam2st_falldown.jsonl" -dt "image" -opt "test"
+python main.py label2jsonl -i "data/processed/gangnam/yeoksam2/Train_dataset_yeoksam2st" -o "data/instruction/train/train_gangnam_yeoksam2st_falldown.jsonl" -dt "image" 
+python main.py label2jsonl -i "data/processed/gangnam/yeoksam2/Test_dataset_yeoksam2st" -o "data/instruction/evaluation/test_gangnam_yeoksam2st_violence.jsonl" -opt "test"
+python main.py label2jsonl -i "data/processed/gangnam/yeoksam2/Train_dataset_yeoksam2st" -o "data/instruction/train/train_gangnam_yeoksam2st_violence.jsonl" 

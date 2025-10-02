@@ -134,7 +134,7 @@ class InternVL3Inferencer:
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True, use_fast=False)
         self.device = device
-        self.generation_config = dict(max_new_tokens=50, do_sample=False)
+        self.generation_config = dict(max_new_tokens=1024, do_sample=False)
         print(f"[INFO] ({os.getpid()}) InternVL 모델 로딩 완료.")
 
     def infer_window(self,
@@ -152,30 +152,6 @@ class InternVL3Inferencer:
         question = video_prefix + prompt
         response = self.model.chat(self.tokenizer, pixel_values, question, self.generation_config)
         return response
-
-# ---------------- 파서 (사용자 제공 로직 그대로) ----------------
-# def parse_prediction(pred_str: str) -> str:
-#     try:
-#         clean_str = pred_str
-#         if '```json' in clean_str:
-#             clean_str = clean_str.split('```json')[1].split('```')[0]
-#         elif '```' in clean_str:
-#             clean_str = clean_str.split('```')[1].split('```')[0]
-#         clean_str = clean_str.strip()
-#         start_brace = clean_str.find('{')
-#         end_brace = clean_str.rfind('}')
-#         if start_brace != -1 and end_brace != -1 and start_brace < end_brace:
-#             json_part = clean_str[start_brace:end_brace + 1]
-#             data = json.loads(json_part)
-#             category = data.get('category')
-#             if category in ['violence', 'normal']:
-#                 return category
-#         cat_match = re.search(r'["\']category["\']\s*:\s*["\'](violence|normal)["\']', clean_str)
-#         if cat_match:
-#             return cat_match.group(1)
-#         return 'violence'
-#     except Exception:
-#         return 'violence'
     
 def parse_prediction(pred_str: str) -> str:
     if not isinstance(pred_str, str): return 'parsing_failed'
@@ -197,6 +173,8 @@ def parse_prediction(pred_str: str) -> str:
         if cat_match: return cat_match.group(1).lower()
         return 'no_json_found'
     except Exception: return 'parsing_failed'
+
+
 
 # ---------------- CUDA 체크 ----------------
 def check_and_set_cuda_device(gpu_id: int) -> dict:
@@ -297,9 +275,6 @@ def model_worker_main(gpu_id: int, ctrl_q: mp.Queue, resp_q: mp.Queue, model_pat
                     input_size=input_size,
                 )
                 label = parse_prediction(raw)
-            # except Exception as e:
-            #     ok = False
-            #     err = repr(e)
             except Exception as e:
                 # ---↓ 에러를 터미널에 직접 출력하는 코드 추가 ↓---
                 print(f"\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
@@ -321,7 +296,7 @@ def model_worker_main(gpu_id: int, ctrl_q: mp.Queue, resp_q: mp.Queue, model_pat
                 "ok": ok,
                 "elapsed": time.time() - t0,
                 "label": label if ok else "violence",
-                "raw": raw if ok else "",
+                "raw": raw, # <--- 에러 여부와 관계없이 raw 값을 항상 전달
                 "error": err,
             })
 
@@ -501,7 +476,7 @@ def run_inference(
     # 프레임 단위 violence 라벨(0/1) 초기화
     per_video_frame_labels = {vp: [0] * video_frames[vp] for vp in videos}
 
-    # <<< -------------------- 여기를 추가하세요 -------------------- >>>
+    # <<< ---------------   ----- 여기를 추가하세요 -------------------- >>>
     per_video_frame_raws = {vp: [""] * video_frames[vp] for vp in videos}
     # <<< ----------------------------------------------------------- >>>
 
@@ -615,70 +590,59 @@ def run_inference(
     stop_all(handles)
     print("[DONE]")
 
-# ---------------- 간단 실행 예시 ----------------
-if __name__ == "__main__":
+def reproduce_single_window_inference():
     """
-    예시 실행:
-      python multi_gpu_infer.py
-    아래 값만 수정해서 테스트 하세요.
+    특정 워커가 수행했을 것으로 추정되는 단일 작업을 정확히 재현합니다.
     """
-    VIDEO_DIR = "/home/piawsa6000/nas192/datasets/projects/huggingface_benchmarks_dataset/Leaderboard_bench/PIA_Violence/dataset/violence"         # a6000
-    VIDEO_DIR = "/mnt/nas_192/datasets/projects/huggingface_benchmarks_dataset/Leaderboard_bench/PIA_Violence/dataset/violence"         # h100
-    # VIDEO_DIR = "data/test/test2"         # h100
+    # 1. 멀티프로세스 실행 시 사용했던 설정과 "완전히" 동일하게 맞춥니다.
+    # --------------------------------------------------------------------
+    VIDEO_PATH   = "sample/fight_0162.mp4"  # "실제" 워커가 사용한 비디오 경로
+    MODEL_PATH   = "ckpts/PIA_Violence"     # "실제" 워커가 로드한 모델 경로
+    START_FRAME  = 1224
+    END_FRAME    = 1235
+    NUM_SEGMENTS = 12
+    INPUT_SIZE   = 448
+    DEVICE       = "cuda:0"
+    PROMPT    = """
+    Watch this short video clip and respond with exactly one JSON object.\n\n[Rules]\n- The category must be either 'violence' or 'normal'.  \n- Classify as violence if any of the following actions are present:  \n  * Punching  \n  * Kicking  \n  * Weapon Threat\n  * Weapon Attack\n  * Falling/Takedown  \n  * Pushing/Shoving  \n  * Brawling/Group Fight  \n- If none of the above are observed, classify as normal.  \n- The following cases must always be classified as normal:  \n  * Affection (hugging, holding hands, light touches)  \n  * Helping (supporting, assisting)  \n  * Accidental (unintentional bumping)  \n  * Playful (non-aggressive playful contact)  \n\n[Output Format]\n- Output exactly one JSON object.  \n- The object must contain only two keys: \"category\" and \"description\".  \n- The description should briefly and objectively describe the scene.  \n\nExample (violence):  \n{\"category\":\"violence\",\"description\":\"A man in a black jacket punches another man, who stumbles backward.\"}\n\nExample (normal):  \n{\"category\":\"normal\",\"description\":\"Two people are hugging inside an elevator
+    """
+    # --------------------------------------------------------------------
 
-    CSV_DIR   = "results/eval_hf_result/InternVL3-2B_gangnam_vietnam_aihubstore_gj_space_no_split"       # CSV 저장 폴더
-    CSV_DIR   = "results/eval_hf_result/InternVL3-2B_gangnam_rwf2000_gj_cctv_scvdALL_NOweapon_no_split"
-    CSV_DIR   = "results/eval_test/test7"
+    print(f"재현 테스트 시작: {os.path.basename(VIDEO_PATH)} [{START_FRAME}-{END_FRAME}]")
 
-    WINDOW    = 12                        # 윈도우 크기(프레임 개수)
-    # PROMPT    = """
-    # Watch this short video clip and respond with exactly one JSON object.\n\n[Rules]\n- The category must be either 'violence' or 'normal'.  \n- Classify as violence if any of the following actions are present:  \n  * Punching  \n  * Kicking  \n  * Weapon Threat\n  * Weapon Attack\n  * Falling/Takedown  \n  * Pushing/Shoving  \n  * Brawling/Group Fight  \n- If none of the above are observed, classify as normal.  \n- The following cases must always be classified as normal:  \n  * Affection (hugging, holding hands, light touches)  \n  * Helping (supporting, assisting)  \n  * Accidental (unintentional bumping)  \n  * Playful (non-aggressive playful contact)  \n\n[Output Format]\n- Output exactly one JSON object.  \n- The object must contain only two keys: \"category\" and \"description\".  \n- The description should briefly and objectively describe the scene.  \n\nExample (violence):  \n{\"category\":\"violence\",\"description\":\"A man in a black jacket punches another man, who stumbles backward.\"}\n\nExample (normal):  \n{\"category\":\"normal\",\"description\":\"Two people are hugging inside an elevator
-    # """
-    PROMPT  = """
-Watch this short video clip (1–2 seconds) and respond with exactly one JSON object.
+    # 2. 비디오 총 프레임 수 확인 (중요!)
+    # `make_windows`가 어떻게 윈도우를 생성했는지 확인하기 위함
+    try:
+        vr = build_video_reader(VIDEO_PATH)
+        total_frames = len(vr)
+        print(f"비디오 정보: 총 {total_frames} 프레임")
+        del vr
+    except Exception as e:
+        print(f"비디오 파일을 읽을 수 없습니다: {e}")
+        return
 
-[Rules]
-- The category must be either 'violence' or 'normal'.
-- Classify as violence if any of the following actions are present:
-  * Punching
-  * Kicking
-  * Weapon Threat
-  * Weapon Attack
-  * Falling/Takedown
-  * Pushing/Shoving
-  * Brawling/Group Fight
-- If none of the above are observed, classify as normal.
-- The following cases must always be classified as normal:
-  * Affection (hugging, holding hands, light touches)
-  * Helping (supporting, assisting)
-  * Accidental (unintentional bumping)
-  * Playful (non-aggressive playful contact)
+    # 3. 단일 추론기 인스턴스 생성
+    inferencer = InternVL3Inferencer(model_path=MODEL_PATH, device=DEVICE)
 
-[Output Format]
-- Output exactly one JSON object.
-- The object must contain only two keys: "category" and "description".
-- The description should briefly and objectively describe the scene.
-
-Example (violence):
-{"category":"violence","description":"A man in a black jacket punches another man, who stumbles backward."}
-
-Example (normal):
-{"category":"normal","description":"Two people are hugging inside an elevator"}
-"""
-    GPU_PROC  = {0:8, 1:8, 2:8, 3:8}                    # GPU0에 프로세스 2개
-    MODEL_ID  = "ckpts/InternVL3-2B_gangnam_vietnam_rwf2000_aihubstore_gj_space_no_split"
-    MODEL_ID  = "ckpts/InternVL3-2B"
-    MODEL_ID  = "ckpts/InternVL3-2B_gangnam_rwf2000_gj_cctv_scvdALL_NOweapon_no_split"
-
-    
-    run_inference(
-        video_dir=VIDEO_DIR,
-        csv_save_dir=CSV_DIR,
-        window_size=WINDOW,
-        gpu_to_nproc=GPU_PROC,
+    # 4. 워커가 했을 것과 똑같은 작업 직접 호출
+    print("\n추론 중...")
+    raw_response = inferencer.infer_window(
+        video_path=VIDEO_PATH,
         prompt=PROMPT,
-        model_path=MODEL_ID,
-        num_segments=12,
-        input_size=448,
+        start_frame=START_FRAME,
+        end_frame=END_FRAME,
+        num_segments=NUM_SEGMENTS,
+        input_size=INPUT_SIZE,
     )
 
+    # 5. 결과 분석
+    label = parse_prediction(raw_response)
+    
+    print("\n========= 추론 결과 =========")
+    print(f"Raw Response:\n{raw_response}")
+    print("-----------------------------")
+    print(f"Parsed Category: {label}")
+    print("============================")
+
+if __name__ == "__main__":
+    reproduce_single_window_inference()

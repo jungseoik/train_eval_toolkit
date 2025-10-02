@@ -101,7 +101,7 @@ def load_video(video_path, bound=None, input_size=448, max_num=1, num_segments=3
 class InternVL3Inferencer:
     # def __init__(self, model_path="ckpts/InternVL3-2B_total_vio", device="cuda:0"):
     def __init__(self, model_path="ckpts/InternVL3-2B_gangnam_rwf2000_gj_cctv_scvdALL_NOweapon_no_split"
-                 , device="cuda:0"):
+                 , device="cuda:1"):
         
     # def __init__(self, model_path="ckpts/merge_result", device="cuda:0"):
     # def __init__(self, model_path="ckpts/InternVL3-2B", device="cuda:0"):
