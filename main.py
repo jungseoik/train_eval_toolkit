@@ -39,7 +39,16 @@ def run_aihub_store_video_split(args):
     process_videos_clips_aihub_store(args.input_dir, args.output_dir, args.num_processes)
 from src.preprocess.label2jsonl import label_to_jsonl_result_save
 def run_label_to_jsonl(args):
-    label_to_jsonl_result_save(args.input_dir, args.output_file, args.option , args.data_type)
+     label_to_jsonl_result_save(
+         input_dir=args.input_dir,
+         output_file_path=args.output_file,
+         mode=args.option,
+         data_type=args.data_type,
+         base_dir="data/",
+         item_type=args.item_type,
+         item_task=args.item_task,
+         task_name=args.task_name,
+     )
 
 def run_preprocess(args): # 이제 각 함수는 args를 받을 수 있습니다.
     """전처리 프로세스를 실행합니다."""
@@ -61,14 +70,14 @@ def run_autolabel(args):
     # data/raw/rwf2000/RWF-2000/train/NonFight
     # data/raw/rwf2000/RWF-2000/train/Fight
     FAILURE_LOG_DIR = "assets/logs"
-    NUM_CORES_LABEL = 8
     
     print("--- Running Gemini Autolabeler ---")
     autolabel_videos_recursively(
         input_folder=args.input_dir,
         failure_log_dir=FAILURE_LOG_DIR,
         num_workers=args.num_process,
-        options=args.options
+        options=args.options,
+        mode=args.mode,
     )
     print("--- Autolabeling finished ---")
     
@@ -89,10 +98,13 @@ if __name__ == '__main__':
                                  help='Input directory containing video clips')
     parser_autolabel.add_argument('-opt','--options', choices=['vio', 'normal', 'basic','vio_timestamp', 
                                                                "aihub_space" , "gj_normal" , "gj_violence",
-                                                               "cctv_normal" , "cctv_violence", "scvd_normal" , "scvd_violence"],  
+                                                               "cctv_normal" , "cctv_violence", "scvd_normal" , "scvd_violence", 
+                                                               "gangnam","hyundai_normal" , "hyundai_falldown" ],  
                                  required=True, help='Labeling mode')
     parser_autolabel.add_argument('-n','--num_process', type=int, default=8, 
                                  required=False, help='Num processes')
+    parser_autolabel.add_argument('-m','--mode', choices=['video', 'image'] , default='video',
+                                 required=False, help='Labeling mode type'),
     parser_autolabel.set_defaults(func=run_autolabel)
     
     # --- 'jsonl_reindex_sorting' 서브 파서 ---
@@ -122,6 +134,12 @@ if __name__ == '__main__':
                             help='train or test extract mode select') 
     parser_label_to_jsonl.add_argument('-dt', '--data_type', default="video", type=str, required=False,
                             help='image or video type select') 
+    parser_label_to_jsonl.add_argument('-ity', '--item_type', default="clip", type=str, required=False,
+                            help='item type select , clip or capture_frame') 
+    parser_label_to_jsonl.add_argument('-itk', '--item_task', default="caption", type=str, required=False,
+                            help='item task select , caption or other')
+    parser_label_to_jsonl.add_argument('-tn', '--task_name', default="violence", type=str, required=False,      
+                                help='task name , violence , falldown , etc')
 
     parser_label_to_jsonl.set_defaults(func=run_label_to_jsonl)    
     

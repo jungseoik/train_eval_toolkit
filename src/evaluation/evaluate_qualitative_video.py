@@ -196,7 +196,7 @@ def infer_categories_for_frames(model, tokenizer, image_size, frames_rgb: List[n
         pixel_values=pixel_values_tensor,
         num_patches_list=num_patches_list,
         questions=questions,
-        generation_config=dict(num_beams=1, max_new_tokens=15, min_new_tokens=5),
+        generation_config=dict(num_beams=1, max_new_tokens=15, min_new_tokens=5 , do_sample=False,),
     )
     cats = [parse_prediction(r) for r in responses]
     # 안전장치: 파싱 실패는 normal로 폴백

@@ -15,7 +15,6 @@ python main.py label2jsonl -i "data/processed/RWF-2000/val" -o "data/instruction
 
 
 python main.py label2jsonl -i "data/processed/RWF-2000/val" -o "data/instruction/evaluation/test_rwf2000_test.jsonl"
-
 python main.py label2jsonl -i "data/raw/ai_hub_cctv" -o "data/instruction/evaluation/total_cctv.jsonl"
 
 
@@ -55,3 +54,80 @@ python main.py label2jsonl -i "data/processed/gangnam/yeoksam2/Test_dataset_yeok
 python main.py label2jsonl -i "data/processed/gangnam/yeoksam2/Train_dataset_yeoksam2st" -o "data/instruction/train/train_gangnam_yeoksam2st_falldown.jsonl" -dt "image" 
 python main.py label2jsonl -i "data/processed/gangnam/yeoksam2/Test_dataset_yeoksam2st" -o "data/instruction/evaluation/test_gangnam_yeoksam2st_violence.jsonl" -opt "test"
 python main.py label2jsonl -i "data/processed/gangnam/yeoksam2/Train_dataset_yeoksam2st" -o "data/instruction/train/train_gangnam_yeoksam2st_violence.jsonl" 
+
+#### 최신버전 
+#####강남 삼성동 ### ### ### ### ### ### ### ### ### ### ### 
+python main.py label2jsonl -i "data/processed/gangnam/samsung/Train/clean/image/falldown" -o "data/instruction/train/train_gangnam_samsung_image_falldown.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "falldown"
+python main.py label2jsonl -i "data/processed/gangnam/samsung/Train/clean/image/violence" -o "data/instruction/train/train_gangnam_samsung_image_violence.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "violence"
+python main.py label2jsonl -i "data/processed/gangnam/samsung/Train/clean/video/falldown" -o "data/instruction/train/train_gangnam_samsung_video_falldown.jsonl" -dt "video" -opt "train" -ity "clip" -itk "caption" -tn "falldown"
+python main.py label2jsonl -i "data/processed/gangnam/samsung/Train/clean/video/violence" -o "data/instruction/train/train_gangnam_samsung_video_violence.jsonl" -dt "video" -opt "train" -ity "clip" -itk "caption" -tn "violence"
+
+python main.py label2jsonl -i "data/processed/gangnam/samsung/Test/clean/image/falldown" -o "data/instruction/evaluation/test_gangnam_samsung_image_falldown.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "falldown" -opt "test"
+python main.py label2jsonl -i "data/processed/gangnam/samsung/Test/clean/image/violence" -o "data/instruction/evaluation/test_gangnam_samsung_image_violence.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "violence" -opt "test"
+python main.py label2jsonl -i "data/processed/gangnam/samsung/Test/clean/video/falldown" -o "data/instruction/evaluation/test_gangnam_samsung_video_falldown.jsonl" -dt "video" -opt "train" -ity "clip" -itk "caption" -tn "falldown" -opt "test"
+python main.py label2jsonl -i "data/processed/gangnam/samsung/Test/clean/video/violence" -o "data/instruction/evaluation/test_gangnam_samsung_video_violence.jsonl" -dt "video" -opt "train" -ity "clip" -itk "caption" -tn "violence" -opt "test"
+
+
+#####강남 개포 4동  ### ### ### ### ### ### ### ### ### ### ### 
+python main.py label2jsonl -i "data/processed/gangnam/gaepo4/Train/clean/image/falldown" -o "data/instruction/train/train_gangnam_gaepo4_image_falldown.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "falldown"
+python main.py label2jsonl -i "data/processed/gangnam/gaepo4/Train/clean/image/violence" -o "data/instruction/train/train_gangnam_gaepo4_image_violence.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "violence"
+python main.py label2jsonl -i "data/processed/gangnam/gaepo4/Train/clean/video/falldown" -o "data/instruction/train/train_gangnam_gaepo4_video_falldown.jsonl" -dt "video" -opt "train" -ity "clip" -itk "caption" -tn "falldown"
+python main.py label2jsonl -i "data/processed/gangnam/gaepo4/Train/clean/video/violence" -o "data/instruction/train/train_gangnam_gaepo4_video_violence.jsonl" -dt "video" -opt "train" -ity "clip" -itk "caption" -tn "violence"
+
+
+python main.py label2jsonl -i "data/processed/gangnam/gaepo4/Test/clean/image/falldown" -o "data/instruction/evaluation/test_gangnam_gaepo4_image_falldown.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "falldown" -opt "test"
+python main.py label2jsonl -i "data/processed/gangnam/gaepo4/Test/clean/image/violence" -o "data/instruction/evaluation/test_gangnam_gaepo4_image_violence.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "violence" -opt "test"
+python main.py label2jsonl -i "data/processed/gangnam/gaepo4/Test/clean/video/falldown" -o "data/instruction/evaluation/test_gangnam_gaepo4_video_falldown.jsonl" -dt "video" -opt "train" -ity "clip" -itk "caption" -tn "falldown" -opt "test"
+python main.py label2jsonl -i "data/processed/gangnam/gaepo4/Test/clean/video/violence" -o "data/instruction/evaluation/test_gangnam_gaepo4_video_violence.jsonl" -dt "video" -opt "train" -ity "clip" -itk "caption" -tn "violence" -opt "test"
+
+#####강남 개포 1동 v2  ### ### ### ### ### ### ### ### ### ### ### 
+python main.py label2jsonl -i "data/processed/gangnam/gaepo1_v2/Train/image/falldown" -o "data/instruction/train/train_gangnam_gaepo1_v2_image_falldown.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "falldown"
+python main.py label2jsonl -i "data/processed/gangnam/gaepo1_v2/Train/image/violence" -o "data/instruction/train/train_gangnam_gaepo1_v2_image_violence.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "violence"
+python main.py label2jsonl -i "data/processed/gangnam/gaepo1_v2/Train/video/falldown" -o "data/instruction/train/train_gangnam_gaepo1_v2_video_falldown.jsonl" -dt "video" -opt "train" -ity "clip" -itk "caption" -tn "falldown"
+python main.py label2jsonl -i "data/processed/gangnam/gaepo1_v2/Train/video/violence" -o "data/instruction/train/train_gangnam_gaepo1_v2_video_violence.jsonl" -dt "video" -opt "train" -ity "clip" -itk "caption" -tn "violence"
+
+
+python main.py label2jsonl -i "data/processed/gangnam/gaepo1_v2/Test/image/falldown" -o "data/instruction/evaluation/test_gangnam_gaepo1_v2_image_falldown.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "falldown" -opt "test"
+python main.py label2jsonl -i "data/processed/gangnam/gaepo1_v2/Test/image/violence" -o "data/instruction/evaluation/test_gangnam_gaepo1_v2_image_violence.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "violence" -opt "test"
+python main.py label2jsonl -i "data/processed/gangnam/gaepo1_v2/Test/video/falldown" -o "data/instruction/evaluation/test_gangnam_gaepo1_v2_video_falldown.jsonl" -dt "video" -opt "train" -ity "clip" -itk "caption" -tn "falldown" -opt "test"
+python main.py label2jsonl -i "data/processed/gangnam/gaepo1_v2/Test/video/violence" -o "data/instruction/evaluation/test_gangnam_gaepo1_v2_video_violence.jsonl" -dt "video" -opt "train" -ity "clip" -itk "caption" -tn "violence" -opt "test"
+
+#####se1 , sec2 없는 버전 아직 없음
+
+
+#####강남 역삼 2동 v2 ### ### ### ### ### ### ### ### ### ### ### 
+python main.py label2jsonl -i "data/processed/gangnam/yeoksam2_v2/Train/image/falldown" -o "data/instruction/train/train_gangnam_yeoksam2_v2_image_falldown.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "falldown"
+python main.py label2jsonl -i "data/processed/gangnam/yeoksam2_v2/Train/image/violence" -o "data/instruction/train/train_gangnam_yeoksam2_v2_image_violence.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "violence"
+python main.py label2jsonl -i "data/processed/gangnam/yeoksam2_v2/Train/video/falldown" -o "data/instruction/train/train_gangnam_yeoksam2_v2_video_falldown.jsonl" -dt "video" -opt "train" -ity "clip" -itk "caption" -tn "falldown"
+python main.py label2jsonl -i "data/processed/gangnam/yeoksam2_v2/Train/video/violence" -o "data/instruction/train/train_gangnam_yeoksam2_v2_video_violence.jsonl" -dt "video" -opt "train" -ity "clip" -itk "caption" -tn "violence"
+
+
+python main.py label2jsonl -i "data/processed/gangnam/yeoksam2_v2/Test/image/falldown" -o "data/instruction/evaluation/test_gangnam_yeoksam2_v2_image_falldown.jsonl" -dt "image" -opt "test" -ity "capture_frame" -itk "caption" -tn "falldown" 
+python main.py label2jsonl -i "data/processed/gangnam/yeoksam2_v2/Test/image/violence" -o "data/instruction/evaluation/test_gangnam_yeoksam2_v2_image_violence.jsonl" -dt "image" -opt "test" -ity "capture_frame" -itk "caption" -tn "violence" 
+python main.py label2jsonl -i "data/processed/gangnam/yeoksam2_v2/Test/video/falldown" -o "data/instruction/evaluation/test_gangnam_yeoksam2_v2_video_falldown.jsonl" -dt "video" -opt "test" -ity "clip" -itk "caption" -tn "falldown" 
+python main.py label2jsonl -i "data/processed/gangnam/yeoksam2_v2/Test/video/violence" -o "data/instruction/evaluation/test_gangnam_yeoksam2_v2_video_violence.jsonl" -dt "video" -opt "test" -ity "clip" -itk "caption" -tn "violence" 
+
+#####se1 , sec2 없는 버전 아직 없음
+### ABB falldown
+python main.py label2jsonl -i "data/processed/ABB_banwoldang/PE/Train" -o "data/instruction/evaluation/test_train_abb_pe.jsonl" -dt "image" -opt "test" -ity "capture_frame" -itk "caption" -tn "falldown" 
+python main.py label2jsonl -i "data/processed/ABB_banwoldang/VQA/Train" -o "data/instruction/evaluation/test_train_abb_vqa.jsonl" -dt "image" -opt "test" -ity "capture_frame" -itk "caption" -tn "falldown" 
+python main.py label2jsonl -i "data/processed/ABB_banwoldang/PE/Test" -o "data/instruction/train/train_abb_pe_test.jsonl" -dt "image" -opt "test"
+python main.py label2jsonl -i "data/processed/ABB_banwoldang/VQA/Test" -o "data/instruction/train/train_abb_vqa_test.jsonl" -dt "image" -opt "test"
+
+### 현대백화점
+python main.py label2jsonl -i "data/processed/hyundai_backhwajum/dtro_hyundai/train" -o "data/instruction/train/train_dtro_hyundai_image_falldown.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "falldown"
+python main.py label2jsonl -i "data/processed/hyundai_backhwajum/abb_hyundai/train" -o "data/instruction/train/train_abb_hyundai_image_falldown.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "falldown"
+python main.py label2jsonl -i "data/processed/hyundai_backhwajum/hyundai_ai/train" -o "data/instruction/train/train_hyundai_ai_image_falldown.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "falldown"
+
+python main.py label2jsonl -i "data/processed/hyundai_backhwajum/dtro_hyundai/test" -o "data/instruction/evaluation/test_dtro_hyundai_image_falldown.jsonl" -dt "image" -opt "test" -ity "capture_frame" -itk "caption" -tn "falldown" 
+python main.py label2jsonl -i "data/processed/hyundai_backhwajum/abb_hyundai/test" -o "data/instruction/evaluation/test_abb_hyundai_image_falldown.jsonl" -dt "image" -opt "test" -ity "capture_frame" -itk "caption" -tn "falldown" 
+python main.py label2jsonl -i "data/processed/hyundai_backhwajum/hyundai_ai/test" -o "data/instruction/evaluation/test_hyundai_ai_image_falldown.jsonl" -dt "image" -opt "test" -ity "capture_frame" -itk "caption" -tn "falldown" 
+
+### 현대백화점 2번쨰
+python main.py label2jsonl -i "data/processed/hyundai_backhwajum/hyundai_image_gen_ai_1st/train" -o "data/instruction/train/train_hyundai_image_gen_ai_1st_image_falldown.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "falldown"
+python main.py label2jsonl -i "data/processed/hyundai_backhwajum/hyundai_PoC_5camera_gen_ai/train" -o "data/instruction/train/train_hyundai_PoC_5camera_gen_ai_image_falldown.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "falldown"
+python main.py label2jsonl -i "data/processed/hyundai_backhwajum/hyundai_PoC_25camera_capture/train" -o "data/instruction/train/train_hyundai_PoC_25camera_capture_image_falldown.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "falldown"
+
+python main.py label2jsonl -i "data/processed/hyundai_backhwajum/hyundai_image_gen_ai_1st/test" -o "data/instruction/evaluation/test_hyundai_image_gen_ai_1st_image_falldown.jsonl" -dt "image" -opt "test" -ity "capture_frame" -itk "caption" -tn "falldown" 
+python main.py label2jsonl -i "data/processed/hyundai_backhwajum/hyundai_PoC_5camera_gen_ai/test" -o "data/instruction/evaluation/test_hyundai_PoC_5camera_gen_ai_image_falldown.jsonl" -dt "image" -opt "test" -ity "capture_frame" -itk "caption" -tn "falldown"
+python main.py label2jsonl -i "data/processed/hyundai_backhwajum/hyundai_PoC_25camera_capture/test" -o "data/instruction/evaluation/test_hyundai_PoC_25camera_capture_image_falldown.jsonl" -dt "image" -opt "test" -ity "capture_frame" -itk "caption" -tn "falldown"

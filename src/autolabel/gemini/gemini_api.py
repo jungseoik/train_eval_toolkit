@@ -11,6 +11,7 @@ class GeminiImageAnalyzer:
         self.model = GenerativeModel(model_name=model_name)
         self.model_name = model_name
     
+
     def analyze_image(self, image_path: str, custom_prompt: str = PROMPT_IMAGE) -> str:
         """
         이미지 분석을 수행합니다.

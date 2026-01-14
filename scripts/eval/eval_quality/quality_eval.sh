@@ -62,3 +62,13 @@ PYTHONPATH="$(pwd)" python src/evaluation/evaluate_qualitative_video.py \
     --window-size 15 \
     --batch-size 20 \
     --multi-gpu
+
+
+###### 임시###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### 
+PYTHONPATH="$(pwd)" python src/evaluation/evaluate_qualitative_video_violence.py \
+    --checkpoint ckpts/InternVL3-2B_gangnam_rwf2000_gj_cctv_scvdALL_NOweapon_no_split \
+    --input-root "tmp/" \
+    --output-root "tmp/tmp" \
+    --window-size 12 \
+    --batch-size 1 \
+    --multi-gpu

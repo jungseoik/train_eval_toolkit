@@ -1,0 +1,56 @@
+{
+    "GangNam": {
+      "root": "data/",
+      "annotation": "data/instruction/train/train_gangnam_rwf2000.jsonl",
+      "data_augment": false,
+      "repeat_time": 1,
+      "length": 2727
+    },
+    "RWF2000_NO_SPLIT": {
+      "root": "data/",
+      "annotation": "data/instruction/train/train_rwf2000_no_split.jsonl",
+      "data_augment": false,
+      "repeat_time": 1,
+      "length": 1999
+    },
+    "SCVD_ALL_NO_WEAPON": {
+      "root": "data/",
+      "annotation": "data/instruction/train/train_scvdALL_NOweapon.jsonl",
+      "data_augment": false,
+      "repeat_time": 1,
+      "length": 2141
+    }
+    ,
+    "GAEPO1_FALLDOWN": {
+      "root": "data/",
+      "annotation": "data/instruction/train/train_gangnam_gaepo1_falldown.jsonl",
+      "data_augment": false,
+      "repeat_time": 1,
+      "length": 124
+    }
+    ,
+    "GAEPO1_VIOLENCE": {
+      "root": "data/",
+      "annotation": "data/instruction/train/train_gangnam_gaepo1_violence.jsonl",
+      "data_augment": false,
+      "repeat_time": 1,
+      "length": 75
+    }
+    ,
+    "YEOKSAM2_FALLDOWN": {
+      "root": "data/",
+      "annotation": "data/instruction/train/train_gangnam_yeoksam2st_falldown.jsonl",
+      "data_augment": false,
+      "repeat_time": 1,
+      "length": 83
+    }
+    ,
+    "YEOKSAM2_VIOLENCE": {
+      "root": "data/",
+      "annotation": "data/instruction/train/train_gangnam_yeoksam2st_violence.jsonl",
+      "data_augment": false,
+      "repeat_time": 1,
+      "length": 89
+    }
+
+}

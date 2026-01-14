@@ -1,0 +1,9 @@
+{
+    "HYUNDAI_POC_5CAMERA_GEN_AI": {
+      "root": "data/",
+      "annotation": "data/instruction/train/train_hyundai_PoC_5camera_gen_ai_image_falldown.jsonl",
+      "data_augment": false,
+      "repeat_time": 1,
+      "length": 417
+    }
+}

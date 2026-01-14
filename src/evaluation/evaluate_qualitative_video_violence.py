@@ -189,12 +189,17 @@ def infer_category_for_window(model, tokenizer, image_size, frames_rgb: List[np.
         tokenizer,
         pixel_values=pixel_values_tensor,
         question=question,
-        generation_config=dict(num_beams=1, max_new_tokens=15, min_new_tokens=5),
+        generation_config=dict(num_beams=1, 
+                               do_sample=False,
+                               max_new_tokens=15,
+
+                                 min_new_tokens=5
+                                 ),
         num_patches_list=num_patches_list,
         history=None,
         return_history=False
     )
-
+    print(response)
     cat = parse_prediction(response)
     return cat if cat in ("violence", "normal") else "normal"
 
@@ -218,7 +223,8 @@ def frames_to_pixel_values(frames_rgb: List[np.ndarray], input_size: int) -> Tup
     all_tensors, num_patches_list = [], []
     for fr in frames_rgb:
         img = pil_from_frame(fr)
-        tiles = dynamic_preprocess(img, image_size=input_size, use_thumbnail=True, max_num=12)
+        # tiles = dynamic_preprocess(img, image_size=input_size, use_thumbnail=True, max_num=12)
+        tiles = dynamic_preprocess(img, image_size=input_size, use_thumbnail=True, max_num=1)
         px = [transform(t) for t in tiles]
         px = torch.stack(px)  # [num_tiles, 3, H, W]
         all_tensors.append(px)

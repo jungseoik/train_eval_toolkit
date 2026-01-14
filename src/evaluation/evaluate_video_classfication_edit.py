@@ -26,6 +26,96 @@ from decord import VideoReader, cpu
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
 import numpy as np
+# === [Step 1] 프롬프트 템플릿 정의 ===
+
+PROMPT_TEMPLATES = {
+    # 1. Violence 분류용 프롬프트
+    "violence": """Watch this short video clip and respond with exactly one JSON object.
+
+[Rules]
+- The category must be either 'violence' or 'normal'.
+- Classify as violence if any of the following actions are present:
+  * Punching
+  * Kicking
+  * Weapon Threat
+  * Weapon Attack
+  * Falling/Takedown
+  * Pushing/Shoving
+  * Brawling/Group Fight
+- If none of the above are observed, classify as normal.
+- The following cases must always be classified as normal:
+  * Affection (hugging, holding hands, light touches)
+  * Helping (supporting, assisting)
+  * Accidental (unintentional bumping)
+  * Playful (non-aggressive playful contact)
+
+[Output Format]
+- Output exactly one JSON object.
+- The object must contain only two keys: "category" and "description".
+- The description should briefly and objectively describe the scene.
+
+Example (violence):
+{"category":"violence", "description":"A man in a black jacket punches another man, who stumbles backward."}
+
+Example (normal):
+{"category":"normal", "description":"Two people are hugging inside an elevator."}""",
+
+    # 2. Falldown 분류용 프롬프트
+    "falldown": """
+Watch this video carefully. Determine if a person has fallen down at any point during the video.
+
+Important classification rules:
+
+- The "falldown" category applies if at ANY MOMENT in the video a person is lying down, regardless of:
+  - the surface (e.g., floor, mattress, bed)
+  - the posture (natural or unnatural)
+  - the cause (e.g., sleeping, collapsing, lying intentionally)
+  - whether they get up afterwards or not
+- This includes:
+  - A person lying flat on the ground or other surfaces at any point
+  - A person collapsed or sprawled in any lying position at any moment
+  - A person who falls down and then gets back up
+  - A person who is lying down and then stands up
+- The "normal" category applies ONLY if throughout the ENTIRE video the person is:
+  - sitting
+  - standing
+  - kneeling
+  - or otherwise upright (never lying down at any point)
+
+[Critical Rule]
+- If a lying position appears even once in the video = falldown
+- If person falls and gets up = falldown
+- If person is lying and stands up = falldown
+- Only if NO lying position occurs throughout entire video = normal
+
+Answer in JSON format with BOTH of the following fields:
+- "category": either "falldown" or "normal"
+- "description": a brief description of what happens in the video, especially mentioning if/when a lying position occurs
+
+Example (falldown - lying throughout):
+{ 
+  "category": "falldown", 
+  "description": "person lying on the floor throughout the video" 
+}
+
+Example (falldown - falls and gets up):
+{ 
+  "category": "falldown", 
+  "description": "person falls to the ground and then gets back up" 
+}
+
+Example (falldown - lying then stands):
+{ 
+  "category": "falldown", 
+  "description": "person is lying on the floor at the start, then stands up" 
+}
+
+Example (normal):
+{ 
+  "category": "normal", 
+  "description": "person sitting on a chair throughout the video" 
+}"""
+}
 
 def build_transform(input_size: int = 448):
     """Return torchvision transform matching InternVL pre‑training."""
@@ -182,11 +272,15 @@ def process_video(item):
     # <<< CHANGED: 프롬프트를 동적으로 생성
     # 1. 처리된 프레임 수에 맞춰 <image> 토큰을 포함한 비디오 프리픽스를 만듭니다.
     video_prefix = ''.join([f'Frame{i+1}: <image>\n' for i in range(len(num_patches_list))])
-
+    
+    prompt_template = PROMPT_TEMPLATES.get(args.prompt_type, PROMPT_TEMPLATES['violence'])
     # 2. 기존의 상세한 지시사항(템플릿)을 정의합니다.
-    prompt_template = (
-        "Watch this short video clip and respond with exactly one JSON object.\n\n[Rules]\n- The category must be either 'violence' or 'normal'.  \n- Classify as violence if any of the following actions are present:  \n  * Punching  \n  * Kicking  \n  * Weapon Threat\n  * Weapon Attack\n  * Falling/Takedown  \n  * Pushing/Shoving  \n  * Brawling/Group Fight  \n- If none of the above are observed, classify as normal.  \n- The following cases must always be classified as normal:  \n  * Affection (hugging, holding hands, light touches)  \n  * Helping (supporting, assisting)  \n  * Accidental (unintentional bumping)  \n  * Playful (non-aggressive playful contact)  \n\n[Output Format]\n- Output exactly one JSON object.  \n- The object must contain only two keys: \"category\" and \"description\".  \n- The description should briefly and objectively describe the scene.  \n\nExample (violence):  \n{\"category\":\"violence\",\"description\":\"A man in a black jacket punches another man, who stumbles backward.\"}\n\nExample (normal):  \n{\"category\":\"normal\",\"description\":\"Two people are hugging inside an elevator"
-    )
+    # prompt_template = (
+    #     "Watch this short video clip and respond with exactly one JSON object.\n\n[Rules]\n- The category must be either 'violence' or 'normal'.  \n- Classify as violence if any of the following actions are present:  \n  * Punching  \n  * Kicking  \n  * Weapon Threat\n  * Weapon Attack\n  * Falling/Takedown  \n  * Pushing/Shoving  \n  * Brawling/Group Fight  \n- If none of the above are observed, classify as normal.  \n- The following cases must always be classified as normal:  \n  * Affection (hugging, holding hands, light touches)  \n  * Helping (supporting, assisting)  \n  * Accidental (unintentional bumping)  \n  * Playful (non-aggressive playful contact)  \n\n[Output Format]\n- Output exactly one JSON object.  \n- The object must contain only two keys: \"category\" and \"description\".  \n- The description should briefly and objectively describe the scene.  \n\nExample (violence):  \n{\"category\":\"violence\",\"description\":\"A man in a black jacket punches another man, who stumbles backward.\"}\n\nExample (normal):  \n{\"category\":\"normal\",\"description\":\"Two people are hugging inside an elevator"
+    # )
+    # prompt_template = (
+    #     '<video>\nClassify the situation as normal or abnormal. Respond only in JSON format: {\"category\": \"normal\" | \"abnormal\"} Examples: - Person walking in mall → {\"category\": \"normal\"} - People fighting → {\"category\": \"abnormal\"}'
+    # )
 
     # 3. 비디오 프리픽스와 템플릿을 합쳐 최종 질문을 완성합니다.
     question = video_prefix + prompt_template
@@ -200,6 +294,7 @@ def process_video(item):
             num_beams=args.num_beams,
             max_new_tokens=50,
             min_new_tokens=5,
+            do_sample=False,
         ),
         verbose=False
     )
@@ -259,8 +354,10 @@ def parse_prediction(pred_str: str) -> str:
             try:
                 data = json.loads(json_part)
                 category = data.get('category')
-                if category in ['violence', 'normal']:
+                if category in ['violence', 'normal' , 'falldown']:
                     return category
+                elif category in ['abnormal']:
+                    return "violence"
             except json.JSONDecodeError:
                 # JSON 파싱에 실패하면 다음 단계로 넘어감
                 pass
@@ -268,9 +365,11 @@ def parse_prediction(pred_str: str) -> str:
         # 3단계: 정규표현식을 이용한 키-값 직접 추출 (Fallback)
         # "category" : "value" 패턴을 직접 찾음 (따옴표 종류, 공백 유연하게 처리)
         # 예: "category":"normal", 'category' : 'violence' 등
-        cat_match = re.search(r'["\']category["\']\s*:\s*["\'](violence|normal)["\']', clean_str)
+
+        # (violence|normal) -> (violence|normal|falldown)
+        cat_match = re.search(r'["\']category["\']\s*:\s*["\'](violence|normal|falldown)["\']', clean_str)
         if cat_match:
-            return cat_match.group(1)  # "violence" 또는 "normal" 반환
+            return cat_match.group(1)
 
         # 4단계: 모든 시도가 실패한 경우
         return 'no_json_found'
@@ -348,7 +447,9 @@ def evaluate_video_classification_parallel(local_rank, model, tokenizer, args):
 
         y_true = []
         y_pred = []
-        valid_gt_labels = {'violence', 'normal'}
+        target_class = 'falldown' if args.prompt_type == 'falldown' else 'violence'
+        valid_gt_labels = {target_class, 'normal'}
+        # valid_gt_labels = {'violence', 'normal'}
         
         for r in merged_results:
             # 정답 레이블이 유효한 경우에만 평가 데이터에 포함시킵니다.
@@ -358,8 +459,14 @@ def evaluate_video_classification_parallel(local_rank, model, tokenizer, args):
                 # 새로운 규칙 적용: 예측이 'normal'이 아니면 모두 'violence'로 간주
                 if r['prediction'] == 'normal':
                     y_pred.append('normal')
+                elif r['prediction'] == target_class:
+                    y_pred.append(target_class)
                 else:
-                    y_pred.append('violence')
+                    # 예측이 normal도 아니고 target_class도 아닌 경우 (파싱 에러 등)
+                    # 보수적으로 target_class(이상상황)로 잡을지, 틀린걸로 칠지에 따라 다르지만
+                    # 기존 로직(else: violence)을 따라가면 아래와 같습니다.
+                    # y_pred.append('violence')
+                    y_pred.append(target_class)
         
         # 2. 유효한 데이터 기준으로 각종 지표를 다시 계산합니다.
         valid_samples = len(y_true)
@@ -368,9 +475,9 @@ def evaluate_video_classification_parallel(local_rank, model, tokenizer, args):
         correct_predictions = sum(1 for gt, pred in zip(y_true, y_pred) if gt == pred)
         accuracy = (correct_predictions / valid_samples) * 100 if valid_samples > 0 else 0.0
         
-        precision = precision_score(y_true, y_pred, pos_label='violence', zero_division=0)
-        recall = recall_score(y_true, y_pred, pos_label='violence', zero_division=0)
-        f1 = f1_score(y_true, y_pred, pos_label='violence', zero_division=0)
+        precision = precision_score(y_true, y_pred, pos_label=target_class, zero_division=0)
+        recall = recall_score(y_true, y_pred, pos_label=target_class, zero_division=0)
+        f1 = f1_score(y_true, y_pred, pos_label=target_class, zero_division=0)
         
         print("\n--- Evaluation Summary ---")
         print(f"GPUs used: {world_size}")
@@ -380,9 +487,9 @@ def evaluate_video_classification_parallel(local_rank, model, tokenizer, args):
         print(f"Valid Videos Evaluated: {valid_samples}")
         print("------------------------------------")
         print(f"Accuracy: {accuracy:.2f}% ({correct_predictions}/{valid_samples})")
-        print(f"Precision (violence): {precision:.4f}")
-        print(f"Recall (violence):    {recall:.4f}")
-        print(f"F1-Score (violence):  {f1:.4f}")
+        print(f"Precision ({target_class}): {precision:.4f}") # 로그 메시지도 target_class로 수정
+        print(f"Recall ({target_class}):    {recall:.4f}")
+        print(f"F1-Score ({target_class}):  {f1:.4f}")
         print("------------------------------------\n")
         
         # 4. 파일 저장 로직은 그대로 유지합니다.
@@ -423,10 +530,13 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--load-in-8bit', action='store_true')
     parser.add_argument('--load-in-4bit', action='store_true')
+    parser.add_argument('--prompt-type', type=str, default='violence', choices=['violence', 'falldown'], help="Type of prompt template to use.")  
+
     args = parser.parse_args()
     
     timestamp = time.strftime('%Y_%m_%d_%H-%M-%S')
-    new_out_dir = os.path.join(args.out_dir, timestamp)
+    new_out_dir = os.path.join(args.out_dir, f"{timestamp}_{args.prompt_type}")
+    # new_out_dir = os.path.join(args.out_dir, timestamp)
     args.out_dir = new_out_dir
     if not os.path.exists(args.out_dir):
         os.makedirs(args.out_dir, exist_ok=True)

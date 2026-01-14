@@ -14,6 +14,27 @@
             "cwd": "${workspaceFolder}",
             "justMyCode": false,
             "stopOnEntry": false
+        },
+        {
+            "name": "Evaluate Qualitative Video Violence",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/evaluation/evaluate_qualitative_video_violence.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "args": [
+                "--checkpoint", "ckpts/InternVL3-2B_gangnam_rwf2000_gj_cctv_scvdALL_NOweapon_no_split",
+                "--input-root", "tmp/",
+                "--output-root", "tmp/tmp",
+                "--window-size", "12",
+                "--batch-size", "1",
+                "--multi-gpu"
+            ],
+            "justMyCode": false
         }
+
     ]
 }

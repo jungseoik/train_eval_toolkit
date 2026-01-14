@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from tqdm import tqdm
 
-HUMAN_PROMPT_VALUE = """<video>
+HUMAN_PROMPT_VALUE_VIDEO_VIOLENCE = """<video>
 Watch this short video clip and respond with exactly one JSON object.
 
 [Rules]
@@ -33,7 +33,55 @@ Example (violence):
 Example (normal):  
 {"category":"normal","description":"Two people are hugging inside an elevator."}
 """
-HUMAN_PROMPT_VALUE_FALLDOWN = """<image>
+
+HUMAN_PROMPT_VALUE_IMAGE_VIOLENCE = """<image>
+Look at this image and respond with exactly one JSON object.
+
+[Rules]
+- The category must be either 'violence' or 'normal'.  
+- Classify as violence ONLY if clear physical contact is visible in the following actions:  
+  * Punching (fist making contact with body)
+  * Kicking (foot/leg making contact with body)
+  * Slapping (hand making contact with face)
+  * Choking (hands on neck/throat)
+  * Grabbing aggressively (forceful hold on body)
+  * Weapon Attack (weapon making contact with person)
+  * Pushing/Shoving (hands actively pushing, person falling from push)
+  * Brawling/Fighting (multiple people in physical contact while fighting)
+- If no clear physical contact is visible, classify as normal.
+- The following cases must always be classified as normal:  
+  * Threatening gestures without contact (raised fist, aggressive posture)
+  * Holding weapons without attacking
+  * Arguing/yelling without physical contact
+  * Affection (hugging, holding hands, gentle touches)  
+  * Helping (supporting, assisting someone up)  
+  * Accidental contact (unintentional bumping)  
+  * Playful interactions (non-aggressive play)  
+
+[Critical Rule]
+- No visible physical contact = normal
+- Threatening or aggressive-looking but no contact = normal
+- Only actual physical contact in violent manner = violence
+
+[Output Format]
+- Output exactly one JSON object.  
+- The object must contain only two keys: "category" and "description".  
+- The description should briefly and objectively describe what is visible in the image.  
+
+Example (violence - contact visible):  
+{"category":"violence","description":"A man in a black jacket's fist is making contact with another man's face, captured at the moment of impact."}
+
+Example (violence - choking):  
+{"category":"violence","description":"A person's hands are wrapped around another person's neck in a choking position."}
+
+Example (normal - threatening without contact):  
+{"category":"normal","description":"Two people facing each other with raised fists, but no physical contact is visible between them."}
+
+Example (normal - affection):  
+{"category":"normal","description":"Two people are hugging inside an elevator."}
+"""
+
+HUMAN_PROMPT_VALUE_IMAGE_FALLDOWN = """<image>
 Analyze this image carefully. Determine if a person has fallen down.
 
 Important classification rules:
@@ -61,11 +109,71 @@ Example:
   "description": "person lying on a mattress in natural posture" 
 }
 """
+HUMAN_PROMPT_VALUE_VIDEO_FALLDOWN ="""<video>
+Watch this video carefully. Determine if a person has fallen down at any point during the video.
 
+Important classification rules:
 
+- The "falldown" category applies if at ANY MOMENT in the video a person is lying down, regardless of:
+  - the surface (e.g., floor, mattress, bed)
+  - the posture (natural or unnatural)
+  - the cause (e.g., sleeping, collapsing, lying intentionally)
+  - whether they get up afterwards or not
+- This includes:
+  - A person lying flat on the ground or other surfaces at any point
+  - A person collapsed or sprawled in any lying position at any moment
+  - A person who falls down and then gets back up
+  - A person who is lying down and then stands up
+- The "normal" category applies ONLY if throughout the ENTIRE video the person is:
+  - sitting
+  - standing
+  - kneeling
+  - or otherwise upright (never lying down at any point)
+
+[Critical Rule]
+- If a lying position appears even once in the video = falldown
+- If person falls and gets up = falldown
+- If person is lying and stands up = falldown
+- Only if NO lying position occurs throughout entire video = normal
+
+Answer in JSON format with BOTH of the following fields:
+- "category": either "falldown" or "normal"
+- "description": a brief description of what happens in the video, especially mentioning if/when a lying position occurs
+
+Example (falldown - lying throughout):
+{ 
+  "category": "falldown", 
+  "description": "person lying on the floor throughout the video" 
+}
+
+Example (falldown - falls and gets up):
+{ 
+  "category": "falldown", 
+  "description": "person falls to the ground and then gets back up" 
+}
+
+Example (falldown - lying then stands):
+{ 
+  "category": "falldown", 
+  "description": "person is lying on the floor at the start, then stands up" 
+}
+
+Example (normal):
+{ 
+  "category": "normal", 
+  "description": "person sitting on a chair throughout the video" 
+}
+"""
+PROMPT_MAPPING = {
+        ("video", "violence"): HUMAN_PROMPT_VALUE_VIDEO_VIOLENCE,
+        ("video", "falldown"): HUMAN_PROMPT_VALUE_VIDEO_FALLDOWN,
+        ("image", "violence"): HUMAN_PROMPT_VALUE_IMAGE_VIOLENCE,
+        ("image", "falldown"): HUMAN_PROMPT_VALUE_IMAGE_FALLDOWN,
+    }
 
 def create_final_dataset(root_dir: str, base_dir:str = "data/", mode: str = "train",
-                         data_type: str = "video") -> list:
+                         data_type: str = "video", item_type: str = "clip" , item_task:str ="caption" ,
+                         task_name:str ="violence") -> list:
     """
     pathlib을 사용해 지정된 디렉토리와 모든 하위 디렉토리에서 JSON 파일을 재귀적으로 찾아
     요청된 최종 데이터셋 구조로 변환합니다.
@@ -148,41 +256,40 @@ def create_final_dataset(root_dir: str, base_dir:str = "data/", mode: str = "tra
                 # 'test' 모드일 경우 'gpt' 부분만 추가
                 conversations.append({"from": "gpt", "value": gpt_value_string})
             else:
-                if data_type == "video":
-                # 기본('train') 모드일 경우 기존과 동일하게 'human'과 'gpt' 모두 추가
-                    conversations.append({"from": "human", "value": HUMAN_PROMPT_VALUE})
-                    conversations.append({"from": "gpt", "value": gpt_value_string})
-                elif data_type == "image":
-                    conversations.append({"from": "human", "value": HUMAN_PROMPT_VALUE_FALLDOWN})
-                    conversations.append({"from": "gpt", "value": gpt_value_string})
+                prompt_key = (data_type, task_name)
+                human_prompt_value = PROMPT_MAPPING.get(prompt_key)
+                if human_prompt_value is None:
+                    print(f"경고: '{data_type}'와 '{task_name}' 조합에 대한 프롬프트가 정의되어 있지 않습니다. 건너뜁니다.")
+                    continue 
+                conversations.append({"from": "human", "value": human_prompt_value})
+                conversations.append({"from": "gpt", "value": gpt_value_string})
+
+                # if data_type == "video":
+                #     conversations.append({"from": "human", "value": HUMAN_PROMPT_VALUE_VIDEO_VIOLENCE})
+                #     conversations.append({"from": "gpt", "value": gpt_value_string})
+                # elif data_type == "image":
+                #     conversations.append({"from": "human", "value": HUMAN_PROMPT_VALUE_IMAGE_FALLDOWN})
+                #     conversations.append({"from": "gpt", "value": gpt_value_string})
                     
             # --- 💡 추가된 부분 끝 ---
             media_relative_path = media_path.relative_to(base_path).as_posix()
             if data_type == "video":
                 item = {
                     "id": current_id,
-                    "type": "clip",
-                    "task": "caption",
+                    "type": item_type,
+                    "task": item_task,
                     "video": media_relative_path,
                     "conversations": conversations
                 }
             elif data_type == "image":
                 item = {
                     "id": current_id,
-                    "type": "capture_frame",
-                    "task": "caption",
+                    "type": item_type,
+                    "task": item_task,
                     "image": media_relative_path,
                     "conversations": conversations
                 }
             
-            # item = {
-            #     "id": current_id,
-            #     "type": "clip",
-            #     "task": "caption",
-            #     "video": video_relative_path,
-            #     # 'conversations' 키에 위에서 생성한 리스트를 할당
-            #     "conversations": conversations
-            # }
             final_dataset.append(item)
             current_id += 1
 
@@ -194,9 +301,9 @@ def create_final_dataset(root_dir: str, base_dir:str = "data/", mode: str = "tra
     return final_dataset
 
 # --- 💡 수정된 부분: mode 파라미터 추가 ---
-def label_to_jsonl_result_save(input_dir, output_file_path, mode="train", data_type="video", base_dir="data/" ):
-    # create_final_dataset 함수 호출 시 mode 인자 전달
-    my_dataset = create_final_dataset(input_dir, base_dir, mode=mode, data_type=data_type)
+def label_to_jsonl_result_save(input_dir, output_file_path, mode="train", data_type="video", base_dir="data/" ,
+                                item_type ="clip" , item_task="caption" , task_name="violence"):
+    my_dataset = create_final_dataset(input_dir, base_dir, mode=mode, data_type=data_type , item_type=item_type, item_task=item_task , task_name=task_name)
     if my_dataset:
             try:
                 with open(output_file_path, 'w', encoding='utf-8') as f:

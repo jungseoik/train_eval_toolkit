@@ -1,5 +1,5 @@
 ## GEMINI setting
-ENV_AUTH = "/home/piawsa6000/nas192/datasets/projects/gangnam_innovation/violence_fintuning/TADO_Violence_GangNAM/configs/gmail-361002-cbcf95afec4a.json"
+ENV_AUTH = "/mnt/nas_192/datasets/projects/gangnam_innovation/violence_fintuning/TADO_Violence_GangNAM/configs/gmail-361002-cbcf95afec4a.json"
 
 GEMINI_MODEL_CONFIG = {
     "model_name" : "gemini-2.5-pro",
