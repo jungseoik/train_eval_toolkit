@@ -6,7 +6,7 @@ from concurrent.futures import ProcessPoolExecutor
 from typing import Optional, List, Tuple
 from functools import partial
 from datetime import datetime
-from src.autolabel.gemini.gemini_api import GeminiImageAnalyzer
+from src.autolabel.gemini.gemini_api_v2 import GeminiImageAnalyzer
 from configs.config_gemini import PROMPT_VIDEO, GEMINI_MODEL_CONFIG, PROMPT_VIDEO_NORMAL_LABEL ,PROMPT_VIDEO_VIOLENCE_LABEL, PROMPT_VIDEO_NORMAL_LABEL_ENHANCED ,PROMPT_VIDEO_VIOLENCE_LABEL_ENHANCED
 from configs.config_gemini_violence_timestamp import PROMPT_VIDEO_VIOLENCE_TIMESTAMP_ENHANCED
 from configs.config_gemini_aihub_space import PROMPT_VIDEO_VIOLENCE_LABEL_ENHANCED_AIHUB_SPACE 

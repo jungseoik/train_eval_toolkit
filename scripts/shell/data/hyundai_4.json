@@ -1,0 +1,44 @@
+{
+    "HYUNDAI_AI": {
+      "root": "data/",
+      "annotation": "data/instruction/train/train_aihub_space.jsonl",
+      "data_augment": false,
+      "repeat_time": 1,
+      "length": 74
+    },
+    "HYUNDAI_IMAGE_GEN_AI_1ST": {
+      "root": "data/",
+      "annotation": "data/instruction/train/train_hyundai_image_gen_ai_1st_image_falldown.jsonl",
+      "data_augment": false,
+      "repeat_time": 1,
+      "length": 80
+    },
+    "HYUNDAI_POC_5CAMERA_GEN_AI": {
+      "root": "data/",
+      "annotation": "data/instruction/train/train_hyundai_PoC_5camera_gen_ai_image_falldown.jsonl",
+      "data_augment": false,
+      "repeat_time": 1,
+      "length": 417
+    },
+    "HYUNDAI_POC_25CAMERA_CAPTURE": {
+      "root": "data/",
+      "annotation": "data/instruction/train/train_hyundai_PoC_25camera_capture_image_falldown.jsonl",
+      "data_augment": false,
+      "repeat_time": 1,
+      "length": 689
+    },
+    "HYUNDAI_HARD_NEGATIVE_2ST": {
+      "root": "data/",
+      "annotation": "data/instruction/train/train_hyundai_hard_negative_2st_image_falldown.jsonl",
+      "data_augment": false,
+      "repeat_time": 1,
+      "length": 181
+    },
+    "HYUNDAI_IMAGE_GEN_AI_ONLY_SANGRAK": {
+      "root": "data/",
+      "annotation": "data/instruction/train/train_hyundai_image_gen_ai_only_sangrak_image_falldown.jsonl",
+      "data_augment": false,
+      "repeat_time": 1,
+      "length": 106
+    }
+}

@@ -191,4 +191,4 @@ xxhash==3.5.0
 yacs==0.1.8
 yarl==1.20.1
 zipp @ file:///home/conda/feedstock_root/build_artifacts/zipp_1749421620841/work
-
+google-genai

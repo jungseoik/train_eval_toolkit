@@ -218,3 +218,5 @@ ckpts/*
 results/eval_result/*
 *.csv
 results/*
+1.png
+test.mp4

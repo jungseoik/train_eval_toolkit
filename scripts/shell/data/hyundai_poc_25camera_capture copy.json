@@ -1,0 +1,9 @@
+{
+    "HYUNDAI_POC_25CAMERA_CAPTURE_TEST": {
+      "root": "data/",
+      "annotation": "data/instruction/train/te_hyundai_PoC_25camera_capture_image_falldown.jsonl",
+      "data_augment": false,
+      "repeat_time": 1,
+      "length": 76
+    }
+}

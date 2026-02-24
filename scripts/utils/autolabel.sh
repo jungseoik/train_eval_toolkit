@@ -111,3 +111,28 @@ python main.py autolabel -i "data/processed/hyundai_backhwajum/hyundai_PoC_5came
 python main.py autolabel -i "data/processed/hyundai_backhwajum/hyundai_image_gen_ai_1st/falldown" -opt "hyundai_falldown" -n 128 -m image
 python main.py autolabel -i "data/processed/hyundai_backhwajum/hyundai_PoC_5camera_gen_ai/gen/falldown" -opt "hyundai_falldown" -n 128 -m image
 python main.py autolabel -i "data/processed/hyundai_backhwajum/hyundai_PoC_25camera_capture/falldown" -opt "hyundai_falldown" -n 128 -m image
+
+## 현대백화점 에스컬레이터 3차
+python main.py autolabel -i "data/processed/hyundai_backhwajum/hyundai_hard_negative_2st/gen/normal" -opt "hyundai_normal" -n 128 -m image
+python main.py autolabel -i "data/processed/hyundai_backhwajum/hyundai_hard_negative_2st/raw/negative_normal" -opt "hyundai_normal" -n 128 -m image
+python main.py autolabel -i "data/processed/hyundai_backhwajum/hyundai_image_gen_ai_only_sangrak/images/normal" -opt "hyundai_normal" -n 128 -m image
+
+python main.py autolabel -i "data/processed/hyundai_backhwajum/hyundai_hard_negative_2st/gen/falldown" -opt "hyundai_falldown" -n 128 -m image
+python main.py autolabel -i "data/processed/hyundai_backhwajum/hyundai_hard_negative_2st/raw/negative_falldown" -opt "hyundai_falldown" -n 128 -m image
+python main.py autolabel -i "data/processed/hyundai_backhwajum/hyundai_image_gen_ai_only_sangrak/images/falldown" -opt "hyundai_falldown" -n 128 -m image
+
+
+## 현대백화점 에스컬레이터 4차
+
+python main.py autolabel -i "data/processed/hyundai_backhwajum/hyundai_01_16_QA/hyundai_01_16_QA_falldown" -opt "hyundai_falldown" -n 128 -m image
+python main.py autolabel -i "data/processed/hyundai_backhwajum/hyundai_01_16_QA/hyundai_01_16_QA_normal" -opt "hyundai_normal" -n 128 -m image
+
+## 현대백화점 에스컬레이터 5차 01 27
+
+python main.py autolabel -i "data/processed/hyundai_backhwajum/hyundai_01_27_QA/raw/falldown" -opt "hyundai_falldown" -n 128 -m image
+python main.py autolabel -i "data/processed/hyundai_backhwajum/hyundai_01_27_QA/raw/normal" -opt "hyundai_normal" -n 128 -m image
+
+## 현대백화점 에스컬레이터 5차 01 27 _ 추가 미탐 오탐 negative
+
+python main.py autolabel -i "data/processed/hyundai_backhwajum/hyundai_01_27_QA_hard_negative/falldown" -opt "hyundai_falldown" -n 128 -m image
+python main.py autolabel -i "data/processed/hyundai_backhwajum/hyundai_01_27_QA_hard_negative/normal" -opt "hyundai_normal" -n 128 -m image

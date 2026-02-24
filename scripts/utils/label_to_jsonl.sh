@@ -131,3 +131,43 @@ python main.py label2jsonl -i "data/processed/hyundai_backhwajum/hyundai_PoC_25c
 python main.py label2jsonl -i "data/processed/hyundai_backhwajum/hyundai_image_gen_ai_1st/test" -o "data/instruction/evaluation/test_hyundai_image_gen_ai_1st_image_falldown.jsonl" -dt "image" -opt "test" -ity "capture_frame" -itk "caption" -tn "falldown" 
 python main.py label2jsonl -i "data/processed/hyundai_backhwajum/hyundai_PoC_5camera_gen_ai/test" -o "data/instruction/evaluation/test_hyundai_PoC_5camera_gen_ai_image_falldown.jsonl" -dt "image" -opt "test" -ity "capture_frame" -itk "caption" -tn "falldown"
 python main.py label2jsonl -i "data/processed/hyundai_backhwajum/hyundai_PoC_25camera_capture/test" -o "data/instruction/evaluation/test_hyundai_PoC_25camera_capture_image_falldown.jsonl" -dt "image" -opt "test" -ity "capture_frame" -itk "caption" -tn "falldown"
+
+### 테스트셋 학습 구축
+python main.py label2jsonl -i "data/processed/hyundai_backhwajum/hyundai_image_gen_ai_1st/test" -o "data/instruction/train/test_hyundai_image_gen_ai_1st_image_falldown.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "falldown" 
+python main.py label2jsonl -i "data/processed/hyundai_backhwajum/hyundai_PoC_5camera_gen_ai/test" -o "data/instruction/train/test_hyundai_PoC_5camera_gen_ai_image_falldown.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "falldown"
+python main.py label2jsonl -i "data/processed/hyundai_backhwajum/hyundai_PoC_25camera_capture/test" -o "data/instruction/train/test_hyundai_PoC_25camera_capture_image_falldown.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "falldown"
+
+
+### 현대백화점 3번쨰
+python main.py label2jsonl -i "data/processed/hyundai_backhwajum/hyundai_hard_negative_2st/train" -o "data/instruction/train/train_hyundai_hard_negative_2st_image_falldown.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "falldown"
+python main.py label2jsonl -i "data/processed/hyundai_backhwajum/hyundai_image_gen_ai_only_sangrak/train" -o "data/instruction/train/train_hyundai_image_gen_ai_only_sangrak_image_falldown.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "falldown"
+
+python main.py label2jsonl -i "data/processed/hyundai_backhwajum/hyundai_hard_negative_2st/test" -o "data/instruction/evaluation/test_hyundai_hard_negative_2st_image_falldown.jsonl" -dt "image" -opt "test" -ity "capture_frame" -itk "caption" -tn "falldown" 
+python main.py label2jsonl -i "data/processed/hyundai_backhwajum/hyundai_image_gen_ai_only_sangrak/test" -o "data/instruction/evaluation/test_hyundai_image_gen_ai_only_sangrak_image_falldown.jsonl" -dt "image" -opt "test" -ity "capture_frame" -itk "caption" -tn "falldown"
+## 테스트셋 학습 구축
+python main.py label2jsonl -i "data/processed/hyundai_backhwajum/hyundai_hard_negative_2st/test" -o "data/instruction/train/test_hyundai_hard_negative_2st_image_falldown.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "falldown"
+python main.py label2jsonl -i "data/processed/hyundai_backhwajum/hyundai_image_gen_ai_only_sangrak/test" -o "data/instruction/train/test_hyundai_image_gen_ai_only_sangrak_image_falldown.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "falldown"
+
+
+### 현대백화점 4번쨰 하드네거티브 박스 추가
+python main.py label2jsonl -i "data/processed/hyundai_backhwajum/hyundai_hard_negative_2st_box/train" -o "data/instruction/train/train_hyundai_hard_negative_2st_box_image_falldown.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "falldown"
+python main.py label2jsonl -i "data/processed/hyundai_backhwajum/hyundai_hard_negative_2st_box/test" -o "data/instruction/evaluation/test_hyundai_hard_negative_2st_box_image_falldown.jsonl" -dt "image" -opt "test" -ity "capture_frame" -itk "caption" -tn "falldown"
+## 테스트셋 학습 구축
+python main.py label2jsonl -i "data/processed/hyundai_backhwajum/hyundai_hard_negative_2st_box/test" -o "data/instruction/train/test_hyundai_hard_negative_2st_box_image_falldown.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "falldown"
+
+
+
+### 현대백화점 5번쨰 01.16 이미지 추가
+# data/processed/hyundai_backhwajum/hyundai_01_16_QA/test
+python main.py label2jsonl -i "data/processed/hyundai_backhwajum/hyundai_01_16_QA/train" -o "data/instruction/train/train_hyundai_01_16_QA_image_falldown.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "falldown"
+python main.py label2jsonl -i "data/processed/hyundai_backhwajum/hyundai_01_16_QA/test" -o "data/instruction/evaluation/test_hyundai_01_16_QA_image_falldown.jsonl" -dt "image" -opt "test" -ity "capture_frame" -itk "caption" -tn "falldown"
+## 테스트셋 학습 구축
+python main.py label2jsonl -i "data/processed/hyundai_backhwajum/hyundai_01_16_QA/test" -o "data/instruction/train/test_hyundai_01_16_QA_image_falldown.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "falldown"
+
+
+### 현대백화점 6번쨰 01.27 이미지 추가
+# data/processed/hyundai_backhwajum/hyundai_01_27_QA/test
+python main.py label2jsonl -i "data/processed/hyundai_backhwajum/hyundai_01_27_QA/train" -o "data/instruction/train/train_hyundai_01_27_QA_image_falldown.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "falldown"
+python main.py label2jsonl -i "data/processed/hyundai_backhwajum/hyundai_01_27_QA/test" -o "data/instruction/evaluation/test_hyundai_01_27_QA_image_falldown.jsonl" -dt "image" -opt "test" -ity "capture_frame" -itk "caption" -tn "falldown"
+## 테스트셋 학습 구축
+python main.py label2jsonl -i "data/processed/hyundai_backhwajum/hyundai_01_27_QA/test" -o "data/instruction/train/test_hyundai_01_27_QA_image_falldown.jsonl" -dt "image" -opt "train" -ity "capture_frame" -itk "caption" -tn "falldown"

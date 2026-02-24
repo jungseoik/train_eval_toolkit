@@ -1,12 +1,24 @@
 ## GEMINI setting
 ENV_AUTH = "/mnt/nas_192/datasets/projects/gangnam_innovation/violence_fintuning/TADO_Violence_GangNAM/configs/gmail-361002-cbcf95afec4a.json"
+ENV_AUTH_V2 = "REDACTED_API_KEY"
 
+# GEMINI_MODEL_CONFIG = {
+#     "model_name" : "gemini-2.5-pro",
+#     "project" : "gmail-361002",
+#     "location" : "us-central1"
+    
+# }
+
+# gemini-3-pro-preview
+# gemini-3-flash-preview
 GEMINI_MODEL_CONFIG = {
-    "model_name" : "gemini-2.5-pro",
+    "model_name" : "gemini-3-pro-preview",
     "project" : "gmail-361002",
     "location" : "us-central1"
     
 }
+
+
 PROMPT_IMAGE = "none"
 
 # # 기존 (비폭력용)

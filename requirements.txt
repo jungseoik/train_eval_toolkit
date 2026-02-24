@@ -31,3 +31,4 @@ yacs
 datasets
 gradio
 scikit-learn
+google-genai

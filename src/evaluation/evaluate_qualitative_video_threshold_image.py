@@ -198,19 +198,21 @@ def infer_categories_for_frames(model, tokenizer, image_size, frames_rgb: List[n
         questions=questions,
         generation_config=dict(num_beams=1, max_new_tokens=15, min_new_tokens=5 , do_sample=False,),
     )
-    print("응답 : ", responses)
-    print("---------------------------------")
     cats = [parse_prediction(r) for r in responses]
     # 안전장치: 파싱 실패는 normal로 폴백
     cats = [c if c in ("falldown", "normal") else "normal" for c in cats]
     return cats
 
+def _text_scale_and_thickness(width: int) -> Tuple[float, int]:
+    scale = max(0.6, width / 1280.0 * 0.8)
+    thickness = 2
+    return scale, thickness
+
 def overlay_text_top_center(frame_bgr: np.ndarray, text: str) -> np.ndarray:
     """상단 중앙에 반투명 박스+텍스트"""
     h, w, _ = frame_bgr.shape
     font = cv2.FONT_HERSHEY_SIMPLEX
-    scale = max(0.6, w / 1280.0 * 0.8)
-    thickness = 2
+    scale, thickness = _text_scale_and_thickness(w)
     # 텍스트 크기 계산
     (tw, th), _ = cv2.getTextSize(text, font, scale, thickness)
     x = (w - tw) // 2
@@ -228,12 +230,34 @@ def overlay_text_top_center(frame_bgr: np.ndarray, text: str) -> np.ndarray:
     cv2.putText(frame_bgr, text, (x, y), font, scale, color, thickness, cv2.LINE_AA)
     return frame_bgr
 
+def overlay_text_top_left(frame_bgr: np.ndarray, text: str, color: Tuple[int, int, int]) -> np.ndarray:
+    """상단 좌측에 반투명 박스+텍스트"""
+    h, w, _ = frame_bgr.shape
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    scale, thickness = _text_scale_and_thickness(w)
+    # 텍스트 크기 계산
+    (tw, th), _ = cv2.getTextSize(text, font, scale, thickness)
+    x = 10
+    y = max(10 + th, 10 + th)
+    # 배경 박스
+    pad = 10
+    x1, y1 = max(0, x - pad), max(0, y - th - pad)
+    x2, y2 = min(w, x + tw + pad), min(h, y + pad)
+    overlay = frame_bgr.copy()
+    cv2.rectangle(overlay, (x1, y1), (x2, y2), (0, 0, 0), -1)
+    alpha = 0.45
+    cv2.addWeighted(overlay, alpha, frame_bgr, 1 - alpha, 0, frame_bgr)
+    # 텍스트
+    cv2.putText(frame_bgr, text, (x, y), font, scale, color, thickness, cv2.LINE_AA)
+    return frame_bgr
+
 def process_video(
     video_path: Path,
     input_root: Path,
     output_root: Path,
     window_size: int,
     batch_size: int,
+    threshold: int,
     model,
     tokenizer,
     image_size: int,
@@ -282,8 +306,6 @@ def process_video(
         return frame_rgb
 
     # 배치 단위로 대표 프레임 추론
-    debug_dir = Path("tmp")
-    debug_dir.mkdir(parents=True, exist_ok=True)
     for s in range(0, len(window_rep_indices), batch_size):
         batch_idxs = window_rep_indices[s:s+batch_size]
         frames_rgb = []
@@ -293,14 +315,22 @@ def process_video(
                 # 못 읽으면 검은 프레임 대체
                 fr = np.zeros((height, width, 3), dtype=np.uint8)
             frames_rgb.append(fr)
-            Image.fromarray(fr).save(debug_dir / f"{video_path.stem}_frame_{idx}.jpg")
         cats = infer_categories_for_frames(model, tokenizer, image_size, frames_rgb)
         categories_per_window.extend(cats)
 
     # 윈도우 인덱스 → 카테고리 매핑
     # window_id for frame f: f // window_size, 하지만 마지막 윈도우가 window_size보다 작을 수 있음 → 안전히 매핑
     # categories_per_window[k]는 frames [k*window_size ... min((k+1)*window_size-1, total-1)] 구간에 적용
-    cat_by_window = categories_per_window
+    cat_by_window = []
+    count_by_window = []
+    consecutive = 0
+    for cat in categories_per_window:
+        if cat == "falldown":
+            consecutive += 1
+        else:
+            consecutive = 0
+        count_by_window.append(consecutive)
+        cat_by_window.append("falldown" if consecutive >= threshold else "normal")
 
     # 다시 처음부터 읽어가며 라벨 오버레이 후 저장
     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
@@ -311,7 +341,11 @@ def process_video(
                 break
             win_id = min(fidx // window_size, len(cat_by_window)-1)
             label = cat_by_window[win_id] if win_id >= 0 else "normal"
+            count = count_by_window[win_id] if win_id >= 0 else 0
             frame_bgr = overlay_text_top_center(frame_bgr, label)
+            count_text = f"falldown: {count}/{threshold}"
+            count_color = (0, 0, 255) if count > 0 else (255, 255, 255)
+            frame_bgr = overlay_text_top_left(frame_bgr, count_text, count_color)
             writer.write(frame_bgr)
             pbar.update(1)
 
@@ -324,6 +358,7 @@ def run_pipeline(
     checkpoint: str,
     window_size: int = 15,
     batch_size: int = 20,
+    threshold: int = 1,
     multi_gpu: bool = False,
 ):
     input_root = Path(input_root).resolve()
@@ -345,6 +380,7 @@ def run_pipeline(
             output_root=output_root,
             window_size=window_size,
             batch_size=batch_size,
+            threshold=threshold,
             model=model,
             tokenizer=tokenizer,
             image_size=image_size,
@@ -358,6 +394,7 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint", type=str, required=True, help="InternVL 체크포인트 경로")
     parser.add_argument("--window-size", type=int, default=15, help="윈도우 크기 (윈도우 마지막 프레임이 대표)")
     parser.add_argument("--batch-size", type=int, default=20, help="한 번에 추론할 대표 프레임 수")
+    parser.add_argument("--threshold", type=int, default=1, help="falldown 연속 카운트 임계값")
     parser.add_argument("--multi-gpu", action="store_true", help="멀티 GPU 분산 로딩 사용")
     args = parser.parse_args()
 
@@ -367,5 +404,6 @@ if __name__ == "__main__":
         checkpoint=args.checkpoint,
         window_size=args.window_size,
         batch_size=args.batch_size,
+        threshold=args.threshold,
         multi_gpu=args.multi_gpu,
     )
