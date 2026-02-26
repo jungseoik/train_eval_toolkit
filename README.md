@@ -148,6 +148,12 @@ python main.py train_test_split -i data/instruction/train/train_total.jsonl -r 0
 
 ### 4) 학습
 
+> **학습 전 3단계 준비가 필요합니다.** 자세한 내용: [docs/train/pre_training_checklist.md](docs/train/pre_training_checklist.md)
+>
+> 1. 라벨 → JSONL 변환 (`main.py label2jsonl`)
+> 2. 메타 JSON 파일 생성 (`scripts/shell/data/*.json`) — 어떤 JSONL을 학습에 쓸지 정의
+> 3. 학습 스크립트에서 `META_PATH` 변수를 생성한 메타 JSON 경로로 수정
+
 대표 학습 스크립트:
 
 ```bash
@@ -158,7 +164,7 @@ GPUS=4 PER_DEVICE_BATCH_SIZE=2 bash scripts/shell/internvl3.0/train_sample_scrip
 EPOCHS=20 GPUS=4 PER_DEVICE_BATCH_SIZE=2 bash scripts/pipe_line/train_eval_save_sample_scripts.sh
 ```
 
-- 메타데이터 입력은 스크립트 내 `--meta_path`(`scripts/shell/data/*.json`)로 제어합니다.
+- 학습 전 체크리스트: [docs/train/pre_training_checklist.md](docs/train/pre_training_checklist.md)
 - 상세 파라미터 설명 및 GPU 메모리 절약 팁: [docs/train/training.md](docs/train/training.md)
 
 ### 5) 평가
