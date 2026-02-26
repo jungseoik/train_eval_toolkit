@@ -154,8 +154,8 @@ JSONL 각 항목의 `"type"` 필드에 들어가는 값입니다.
 
 ```bash
 python main.py label2jsonl \
-  -i data/processed/gangnam/samsung/Train/clean/video/violence \
-  -o data/instruction/train/train_gangnam_samsung_video_violence.jsonl \
+  -i data/processed/gangnam/yeoksam2_v2/Train/video/violence \
+  -o data/instruction/train/train_gangnam_yeoksam2_v2_video_violence.jsonl \
   -dt video \
   -opt train \
   -ity clip \
@@ -180,8 +180,8 @@ python main.py label2jsonl \
 
 ```bash
 python main.py label2jsonl \
-  -i data/processed/hyundai_backhwajum/hyundai_01_27_QA/train \
-  -o data/instruction/train/train_hyundai_01_27_QA_image_falldown.jsonl \
+  -i data/processed/gangnam/yeoksam2_v2/Train/image/falldown \
+  -o data/instruction/train/train_gangnam_yeoksam2_v2_image_falldown.jsonl \
   -dt image \
   -opt train \
   -ity capture_frame \
@@ -193,8 +193,8 @@ python main.py label2jsonl \
 
 ```bash
 python main.py label2jsonl \
-  -i data/processed/hyundai_backhwajum/hyundai_01_27_QA/test \
-  -o data/instruction/evaluation/test_hyundai_01_27_QA_image_falldown.jsonl \
+  -i data/processed/gangnam/yeoksam2_v2/Test/image/falldown \
+  -o data/instruction/evaluation/test_gangnam_yeoksam2_v2_image_falldown.jsonl \
   -dt image \
   -opt test \
   -ity capture_frame \
