@@ -1,6 +1,6 @@
-# TADO_Violence_GangNAM
+# train_eval_toolkit
 
-폭력/낙상 감지를 위한 VLM(InternVL 계열) 데이터 구축, 오토라벨링, 학습, 평가, 체크포인트 배포 준비를 한 저장소에서 다루는 프로젝트입니다.
+ VLM(InternVL 계열) 데이터 구축, 오토라벨링, 학습, 평가, 체크포인트 배포 준비를 한 저장소에서 다루는 프로젝트입니다.
 
 ```mermaid
 flowchart LR
@@ -35,14 +35,26 @@ flowchart LR
 
 ### 1) 환경 설치
 
+**conda 환경 생성 (권장)**
+
 ```bash
+# 1. Python 3.10 conda 환경 생성
+conda create -n vlm python=3.10 -y
+conda activate vlm
+
+# 2. 전체 의존성 설치 (PyTorch CUDA wheel 포함)
 pip install -r requirements.txt
+
+# 3. flash-attn (CUDA 빌드 필요, 시간 소요)
+pip install flash-attn==2.3.6 --no-build-isolation
 ```
 
-필요 시 확장 의존성:
+> `requirements.txt` 상단의 `--extra-index-url`로 PyTorch CUDA wheel이 자동으로 선택됩니다.
+
+**import 종속성 검증**
 
 ```bash
-pip install -r requirements2.txt
+PYTHONPATH="$(pwd)" pytest tests/test_imports.py -v
 ```
 
 ### 2) 오토라벨링 사전 설정
@@ -189,3 +201,10 @@ cp ckpts/InternVL3-2B/config.json ckpts/$MERGE_DIR/
 - `configs/config_gemini.py` 등 설정 파일은 환경별로 분리해 관리하세요.
 - 대용량 데이터/체크포인트는 Git 대신 별도 스토리지(예: NAS, 오브젝트 스토리지) 사용을 권장합니다.
 - 학습 전 `jsonl_inform_check`, `json_category_stats`로 데이터 품질을 먼저 확인하세요.
+
+## 테스트
+
+- 테스트 코드는 루트 `tests/`에서 관리합니다.
+- 기본 실행: `pytest -q`
+- 통합/라이브 테스트는 `integration` marker로 분리 관리합니다.
+- 상세 명세: [docs/testing/pytest.md](docs/testing/pytest.md)

@@ -1,34 +1,55 @@
-google-cloud-aiplatform
-decord 
-opencv-python
+# =============================================================================
+# TADO Violence GangNAM - Training Requirements
+# Target: InternVL3 fine-tuning (internvl_chat_finetune.py)
+# Python: 3.10 | CUDA: 12.1
+#
+# 설치: pip install -r requirements.txt
+# =============================================================================
+
+--extra-index-url https://download.pytorch.org/whl/cu121
+
+# --- PyTorch ---
+torch==2.1.2
+torchvision==0.16.2
+
+# --- NumPy (torch 2.1.x 호환 버전으로 고정) ---
+numpy==1.26.2
+
+# --- Transformers & Training ---
+transformers==4.37.2
+tokenizers==0.15.1
+sentencepiece==0.1.99
 accelerate==0.28.0
-bitsandbytes==0.41.0
-decord
+peft==0.10.0
+datasets
+
+# --- Distributed Training ---
 deepspeed==0.13.5
+
+# --- Quantization ---
+bitsandbytes==0.41.0
+
+# --- Flash Attention ---
+# requirements.txt는 per-package 빌드 옵션을 지원하지 않으므로 별도 설치 필요:
+#   pip install flash-attn==2.3.6 --no-build-isolation
+
+# --- Vision / Image ---
+timm==0.9.12
 einops==0.6.1
 einops-exts==0.0.4
-huggingface_hub
-imageio
-numpy==1.26.2
-opencv-python
-orjson
-peft==0.10.0
-pycocoevalcap
-pyyaml
-scikit-learn>=1.2.2
+Pillow
+opencv-python==4.11.0.86
+imageio==2.37.0
+decord==0.6.0
+
+# --- Data / Utilities ---
 scipy
-sentencepiece==0.1.99
+scikit-learn
+orjson
+PyYAML
+yacs==0.1.8
+tqdm
 shortuuid
 tensorboardX
 termcolor
-timm==0.9.12
-tokenizers==0.15.1
-torch==2.1.2
-torchvision==0.16.2
-tqdm
-transformers==4.37.2
-yacs
-datasets
-gradio
-scikit-learn
-google-genai
+pycocoevalcap
