@@ -23,15 +23,23 @@ export GEMINI_API_KEY="your-api-key-here"
 
 ## 빠른 시작
 
-```bash
-# 비디오 자동 라벨링
-python main.py autolabel -i <input_dir> -opt vio -n 16 -m video
+Gangnam 데이터 기준 예시입니다. 데이터 다운로드 및 폴더 구조는 [docs/data/download/guideline_gangnam.md](../data/download/guideline_gangnam.md)를 참조하세요.
 
-# 이미지 자동 라벨링
-python main.py autolabel -i <input_dir> -opt gangnam -n 8 -m image
+```bash
+# 비디오 자동 라벨링 (Gangnam 기준)
+python main.py autolabel \
+  -i data/processed/gangnam/gaepo1_v2/Train/video/violence/violence/clip \
+  -opt gangnam -n 16 -m video
+
+# 이미지 자동 라벨링 (Gangnam 기준)
+python main.py autolabel \
+  -i data/processed/gangnam/yeoksam2_v2/Train/video/falldown \
+  -opt gangnam -n 8 -m image
 
 # JSON description 번역 (영→한)
-python main.py translate -i <json_dir> -n 16
+python main.py translate \
+  -i data/processed/gangnam/gaepo1_v2/Train/video/violence/violence/clip \
+  -n 16
 ```
 
 ## 지원 options 목록
