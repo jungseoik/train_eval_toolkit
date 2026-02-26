@@ -1,9 +1,9 @@
 # e.g.
-## GPUS=2 PER_DEVICE_BATCH_SIZE=1 sh scripts/shell/internvl3.0/hyundai_2_15.sh
+## GPUS=2 PER_DEVICE_BATCH_SIZE=2 sh scripts/shell/internvl3.0/hyundai_4_15_3_5_2b.sh
 # choose samller PER_DEVICE_BATCH_SIZE to reduce GPU Memory
 # h100
-# GPUS=4 PER_DEVICE_BATCH_SIZE=2 BATCH_SIZE=256 sh scripts/shell/internvl3.0/hyundai_2_15.sh
-# GPUS=4 PER_DEVICE_BATCH_SIZE=2 sh scripts/shell/internvl3.0/hyundai_2_15.sh
+# GPUS=4 PER_DEVICE_BATCH_SIZE=1 BATCH_SIZE=256 sh scripts/shell/internvl3.0/hyundai_3_5.sh
+# GPUS=4 PER_DEVICE_BATCH_SIZE=2 sh scripts/shell/internvl3.0/hyundai_4_15_3_5_2b.sh
 
 set -x
 
@@ -11,6 +11,7 @@ GPUS=${GPUS:-8}
 BATCH_SIZE=${BATCH_SIZE:-512}
 PER_DEVICE_BATCH_SIZE=${PER_DEVICE_BATCH_SIZE:-4}
 GRADIENT_ACC=$((BATCH_SIZE / PER_DEVICE_BATCH_SIZE / GPUS))
+MERGE_DIR="InternVL3-2B_hyundai_5_add_ft_box_10"
 
 export PYTHONPATH="${PYTHONPATH}:$(pwd)"
 export MASTER_PORT=34229
@@ -39,7 +40,7 @@ torchrun \
   --model_name_or_path "ckpts/InternVL3-2B" \
   --conv_style "internvl2_5" \
   --output_dir ${OUTPUT_DIR} \
-  --meta_path "scripts/shell/data/hyundai_2.json" \
+  --meta_path "scripts/shell/data/hyundai_hard_negative_2st_box.json" \
   --overwrite_output_dir True \
   --force_image_size 448 \
   --max_dynamic_patch 32 \
@@ -52,7 +53,7 @@ torchrun \
   --vision_select_layer -1 \
   --dataloader_num_workers 4 \
   --bf16 True \
-  --num_train_epochs 15 \
+  --num_train_epochs 5 \
   --per_device_train_batch_size ${PER_DEVICE_BATCH_SIZE} \
   --gradient_accumulation_steps ${GRADIENT_ACC} \
   --evaluation_strategy "no" \
@@ -76,9 +77,9 @@ torchrun \
   2>&1 | tee -a "${OUTPUT_DIR}/training_log.txt"
 
 
-MERGE_DIR="InternVL3-2B_hyundai_2_15"
 mkdir ckpts/$MERGE_DIR
 PYTHONPATH="$(pwd)" python src/training/tools/merge_lora.py ckpts/lora ckpts/$MERGE_DIR
-cp ckpts/InternVL3-2B/*.py ckpts/$MERGE_DIR/
-cp ckpts/InternVL3-2B/config.json ckpts/$MERGE_DIR/
+cp ckpts/InternVL3-2B_hyundai_5_20/*.py ckpts/$MERGE_DIR/
+cp ckpts/InternVL3-2B_hyundai_5_20/config.json ckpts/$MERGE_DIR/
 rm -rf ckpts/lora
+

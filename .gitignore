@@ -206,6 +206,8 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
+!data/instruction/test/sample_test.jsonl
+!data/instruction/test/sample_train.jsonl
 data/*
 .qodo
 configs/gmail-361002-cbcf95afec4a.json
@@ -221,3 +223,4 @@ results/*
 1.png
 test.mp4
 .claude
+pytest.ini
