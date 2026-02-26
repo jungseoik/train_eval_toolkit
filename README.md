@@ -111,7 +111,7 @@ python src/train_test_split_folder.py -i data/processed/hyundai_backhwajum/hyund
 
 ```bash
 # 비디오 라벨링
-python main.py autolabel -i data/processed/gangnam/gaepo1_v2/Train/video/violence/violence/clip -opt gangnam -n 16 -m video
+python main.py autolabel -i data/processed/gangnam/gaepo1_v2/Train/video/violence/violence/clip -opt vio -n 16 -m video
 
 # 이미지 라벨링
 python main.py autolabel -i data/processed/hyundai_backhwajum/abb_hyundai/train/falldown -opt hyundai_falldown -n 128 -m image
