@@ -61,14 +61,18 @@ hf download OpenGVLab/InternVL3-2B \
 conda create -n vlm python=3.10 -y
 conda activate vlm
 
-# 2. 전체 의존성 설치 (PyTorch CUDA wheel 포함)
+# 2. PyTorch (CUDA 12.1) 별도 설치
+pip install torch==2.1.2 torchvision==0.16.2 \
+    --index-url https://download.pytorch.org/whl/cu121
+
+# 3. 나머지 의존성 설치
 pip install -r requirements.txt
 
-# 3. flash-attn (CUDA 빌드 필요, 시간 소요)
+# 4. flash-attn (CUDA 빌드 필요, 시간 소요)
 pip install flash-attn==2.3.6 --no-build-isolation
 ```
 
-> `requirements.txt` 상단의 `--extra-index-url`로 PyTorch CUDA wheel이 자동으로 선택됩니다.
+> PyTorch는 `--index-url`로 단독 지정하여 설치합니다. 다른 인덱스와의 충돌을 방지하고 올바른 CUDA wheel이 설치됩니다.
 
 **import 종속성 검증**
 

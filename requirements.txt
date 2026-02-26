@@ -6,11 +6,8 @@
 # 설치: pip install -r requirements.txt
 # =============================================================================
 
---extra-index-url https://download.pytorch.org/whl/cu121
-
-# --- PyTorch ---
-torch==2.1.2
-torchvision==0.16.2
+# --- PyTorch는 별도 설치 (아래 README 설치 가이드 참고) ---
+# pip install torch==2.1.2 torchvision==0.16.2 --index-url https://download.pytorch.org/whl/cu121
 
 # --- NumPy (torch 2.1.x 호환 버전으로 고정) ---
 numpy==1.26.2
