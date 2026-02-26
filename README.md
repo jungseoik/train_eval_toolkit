@@ -124,26 +124,36 @@ python main.py autolabel -i data/processed/hyundai_backhwajum/abb_hyundai/train/
 
 ```bash
 # 빈 JSON(clips) 점검
-python src/data_checker/stats/empty_json_checker.py --json_dir data/raw/ai_hub_indoor_store_violence
+python src/data_checker/stats/empty_json_checker.py --json_dir data/processed/gangnam
 
 # 카테고리 분포 점검
-python src/stats/json_category_stats.py data/processed/hyundai_backhwajum
+python src/stats/json_category_stats.py data/processed/gangnam
 ```
 
 > 라벨 → JSONL 변환 옵션 전체 설명: [docs/cleaning/label_to_jsonl.md](docs/cleaning/label_to_jsonl.md)
 
+Gangnam 데이터를 다운받아 압축 해제하면 `data/processed/gangnam/` 아래 `yeoksam2_v2/`, `gaepo1_v2/` 등의 구역 폴더가 생성됩니다. 각 구역 폴더 하위는 `Train/video/<category>/`, `Test/video/<category>/` 구조입니다.
+
 ```bash
-# 라벨 폴더 -> 학습용 JSONL 변환
+# 학습용 JSONL 생성 (Train 폴더 기준)
 python main.py label2jsonl \
-  -i data/processed/gangnam/samsung/Train/clean/video/violence \
-  -o data/instruction/train/train_gangnam_samsung_video_violence.jsonl \
+  -i data/processed/gangnam/yeoksam2_v2/Train/video/violence \
+  -o data/instruction/train/train_gangnam_yeoksam2_v2_video_violence.jsonl \
   -dt video -opt train -ity clip -itk caption -tn violence
 
+# 평가용 JSONL 생성 (Test 폴더 기준)
+python main.py label2jsonl \
+  -i data/processed/gangnam/yeoksam2_v2/Test/video/falldown \
+  -o data/instruction/evaluation/test_gangnam_yeoksam2_v2_video_falldown.jsonl \
+  -dt video -opt test -ity clip -itk caption -tn falldown
+
 # JSONL 분포/유효성 점검
-python main.py jsonl_inform_check -i data/instruction/train/train_gangnam_samsung_video_violence.jsonl
+python main.py jsonl_inform_check -i data/instruction/train/train_gangnam_yeoksam2_v2_video_violence.jsonl
 
 # 필요 시 train/test JSONL 분리
-python main.py train_test_split -i data/instruction/train/train_total.jsonl -r 0.1 -o data/instruction
+python main.py train_test_split \
+  -i data/instruction/train/train_gangnam_yeoksam2_v2_video_violence.jsonl \
+  -r 0.1 -o data/instruction
 ```
 
 ### 4) 학습
