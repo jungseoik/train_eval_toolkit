@@ -1,17 +1,17 @@
 #!/bin/bash
 # Usage:
 #   sh scripts/shell/internvl3.0/train_sample_scripts.sh
-#   GPUS=4 PER_DEVICE_BATCH_SIZE=2 sh scripts/shell/internvl3.0/train_sample_scripts.sh
+#   GPUS=4 PER_DEVICE_BATCH_SIZE=1 sh scripts/shell/internvl3.0/train_sample_scripts.sh
 
 set -e
 set -x
 
 # ─── 사용자 설정 변수 ────────────────────────────────────────────
 BASE_MODEL="ckpts/InternVL3-2B"
-META_PATH="scripts/shell/data/hyundai_hard_negative_2st_box.json"
+META_PATH="scripts/shell/data/sample.json"
 DEEPSPEED_CONFIG="configs/deepspeed/zero_stage1_config.json"
 LORA_OUTPUT_DIR="ckpts/lora"
-MERGE_DIR="ckpts/InternVL3-2B_hyundai_sample"
+MERGE_DIR="ckpts/InternVL3-2B_sample"
 
 EPOCHS=5
 LEARNING_RATE=4e-5
