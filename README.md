@@ -28,7 +28,8 @@ flowchart LR
 | 오토라벨링 | 영상/이미지 자동 라벨 생성 | `main.py autolabel` | [`docs/labeling/autolabeling.md`](docs/labeling/autolabeling.md) |
 | 데이터클리닝/검수 | 빈 라벨/분포/JSONL 품질 점검 | `empty_json_checker.py`, `json_category_stats.py`, `main.py jsonl_inform_check` | `src/data_checker/stats/empty_json_checker.py`, `src/stats/json_category_stats.py`, `src/utils/jsonl_inform_check.py` |
 | 학습 | InternVL 파인튜닝 | `scripts/shell/internvl3.0/*.sh` | [`docs/train/training.md`](docs/train/training.md) |
-| 평가 | 비디오/이미지 성능 평가 | `evaluate_video_classfication_edit.py`, `evaluate_image_classfication.py` | `src/evaluation/evaluate_video_classfication_edit.py`, `src/evaluation/evaluate_image_classfication.py` |
+| 평가 | 비디오/이미지 정량 평가 | `evaluate_video_classfication_edit.py`, `evaluate_image_classfication.py` | [`docs/eval/eval_image_falldown.md`](docs/eval/eval_image_falldown.md) |
+| 평가 | 비디오 정성 평가 (threshold + 오버레이) | `evaluate_qualitative_video_threshold_image.py` | [`docs/eval/eval_quality.md`](docs/eval/eval_quality.md) |
 | 배포 | LoRA 병합 후 추론용 체크포인트 생성 | `merge_lora.py` | `src/training/tools/merge_lora.py`, `scripts/pipe_line/train_eval_save_hyundai_8_20.sh` |
 
 ## 빠른 시작
@@ -153,8 +154,44 @@ EPOCHS=20 GPUS=4 PER_DEVICE_BATCH_SIZE=2 bash scripts/pipe_line/train_eval_save_
 
 ### 5) 평가
 
+#### 5-1) 이미지 분류 정량 평가
+
+JSONL 어노테이션 기반으로 Precision / Recall / F1 을 산출합니다.
+
 ```bash
-# 비디오 평가
+PYTHONPATH="$(pwd)" python src/evaluation/evaluate_image_classfication.py \
+  --checkpoint ckpts/InternVL3-2B_hyundai_8_20 \
+  --annotation data/instruction/evaluation/test_hyundai_abb_image_falldown.jsonl \
+  --image-root data \
+  --out-dir results/eval_result_image \
+  --batch-size 20 \
+  --multi-gpu
+```
+
+> 참조 스크립트: `scripts/eval/eval_image_falldown/eval.sh`
+> 상세 가이드: [docs/eval/eval_image_falldown.md](docs/eval/eval_image_falldown.md)
+
+#### 5-2) 비디오 정성 평가 (Threshold + 이미지 오버레이)
+
+슬라이딩 윈도우로 비디오를 추론하고 판정 결과를 프레임에 오버레이한 영상을 저장합니다.
+
+```bash
+PYTHONPATH="$(pwd)" python src/evaluation/evaluate_qualitative_video_threshold_image.py \
+    --checkpoint ckpts/InternVL3-2B_hyundai_5_20 \
+    --input-root "data/processed/hyundai_backhwajum/hyundai_video_macs_test/01_27" \
+    --output-root "results/eval_quality/eva_quality_hyundai/InternVL3-2B_hyundai_5_20/falldown_poc_01_27" \
+    --window-size 15 \
+    --batch-size 40 \
+    --threshold 1 \
+    --multi-gpu
+```
+
+> 참조 스크립트: `scripts/eval/eval_quality/eval.sh`
+> 상세 가이드: [docs/eval/eval_quality.md](docs/eval/eval_quality.md)
+
+#### 5-3) 비디오 정량 평가 (torchrun)
+
+```bash
 PYTHONPATH="$(pwd)" torchrun --nproc_per_node=2 src/evaluation/evaluate_video_classfication_edit.py \
   --checkpoint ckpts/InternVL3-2B_gangnam \
   --annotation data/instruction/evaluation/test_gangnam.jsonl \
@@ -163,15 +200,6 @@ PYTHONPATH="$(pwd)" torchrun --nproc_per_node=2 src/evaluation/evaluate_video_cl
   --num-frames 12 \
   --workers-per-gpu 8 \
   --prompt-type violence
-
-# 이미지 평가
-PYTHONPATH="$(pwd)" python src/evaluation/evaluate_image_classfication.py \
-  --checkpoint ckpts/InternVL3-2B_hyundai_8_20 \
-  --annotation data/instruction/evaluation/test_hyundai_abb_image_falldown.jsonl \
-  --image-root data \
-  --out-dir results/eval_result_image \
-  --batch-size 20 \
-  --multi-gpu
 ```
 
 ### 6) 배포 (체크포인트 배포)
