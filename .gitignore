@@ -215,6 +215,9 @@ data/instruction/test/*
 !data/instruction/train/
 data/instruction/train/*
 !data/instruction/train/sample_train.jsonl
+!data/instruction/evaluation/
+data/instruction/evaluation/*
+!data/instruction/evaluation/sample_test.jsonl
 .qodo
 configs/gmail-361002-cbcf95afec4a.json
 !assets/edit_video.png
@@ -224,6 +227,7 @@ IntenVL3_Violence_SFT
 *jsonl
 !data/instruction/test/sample_test.jsonl
 !data/instruction/train/sample_train.jsonl
+!data/instruction/evaluation/sample_test.jsonl
 ckpts/*
 results/eval_result/*
 *.csv
