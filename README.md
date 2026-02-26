@@ -128,8 +128,12 @@ python src/data_checker/stats/empty_json_checker.py --json_dir data/raw/ai_hub_i
 
 # 카테고리 분포 점검
 python src/stats/json_category_stats.py data/processed/hyundai_backhwajum
+```
 
-# 라벨 폴더 -> 학습용 JSONL 변환 (옵션 전체 가이드: docs/cleaning/label_to_jsonl.md)
+> 라벨 → JSONL 변환 옵션 전체 설명: [docs/cleaning/label_to_jsonl.md](docs/cleaning/label_to_jsonl.md)
+
+```bash
+# 라벨 폴더 -> 학습용 JSONL 변환
 python main.py label2jsonl \
   -i data/processed/gangnam/samsung/Train/clean/video/violence \
   -o data/instruction/train/train_gangnam_samsung_video_violence.jsonl \
@@ -137,8 +141,6 @@ python main.py label2jsonl \
 
 # JSONL 분포/유효성 점검
 python main.py jsonl_inform_check -i data/instruction/train/train_gangnam_samsung_video_violence.jsonl
-
-# 옵션 전체 설명 및 포맷 명세: docs/cleaning/label_to_jsonl.md
 
 # 필요 시 train/test JSONL 분리
 python main.py train_test_split -i data/instruction/train/train_total.jsonl -r 0.1 -o data/instruction
