@@ -27,6 +27,7 @@ flowchart LR
 | 데이터 수집 | 원본 데이터 정리/분할 | `main.py gj_split`, `main.py aihub_store_split`, `src/train_test_split_folder.py` | `main.py`, `src/preprocess/video_splitter.py`, `src/train_test_split_folder.py` |
 | 오토라벨링 | 영상/이미지 자동 라벨 생성 | `main.py autolabel` | [`docs/labeling/autolabeling.md`](docs/labeling/autolabeling.md) |
 | 데이터클리닝/검수 | 빈 라벨/분포/JSONL 품질 점검 | `empty_json_checker.py`, `json_category_stats.py`, `main.py jsonl_inform_check` | `src/data_checker/stats/empty_json_checker.py`, `src/stats/json_category_stats.py`, `src/utils/jsonl_inform_check.py` |
+| 데이터클리닝/검수 | JSON 라벨 → 학습/평가용 JSONL 변환 | `main.py label2jsonl` | [`docs/cleaning/label_to_jsonl.md`](docs/cleaning/label_to_jsonl.md) |
 | 학습 | InternVL 파인튜닝 | `scripts/shell/internvl3.0/*.sh` | [`docs/train/training.md`](docs/train/training.md) |
 | 평가 | 비디오/이미지 정량 평가 | `evaluate_video_classfication_edit.py`, `evaluate_image_classfication.py` | [`docs/eval/eval_image_falldown.md`](docs/eval/eval_image_falldown.md) |
 | 평가 | 비디오 정성 평가 (threshold + 오버레이) | `evaluate_qualitative_video_threshold_image.py` | [`docs/eval/eval_quality.md`](docs/eval/eval_quality.md) |
@@ -128,7 +129,7 @@ python src/data_checker/stats/empty_json_checker.py --json_dir data/raw/ai_hub_i
 # 카테고리 분포 점검
 python src/stats/json_category_stats.py data/processed/hyundai_backhwajum
 
-# 라벨 폴더 -> 학습용 JSONL 변환
+# 라벨 폴더 -> 학습용 JSONL 변환 (옵션 전체 가이드: docs/cleaning/label_to_jsonl.md)
 python main.py label2jsonl \
   -i data/processed/gangnam/samsung/Train/clean/video/violence \
   -o data/instruction/train/train_gangnam_samsung_video_violence.jsonl \
@@ -136,6 +137,8 @@ python main.py label2jsonl \
 
 # JSONL 분포/유효성 점검
 python main.py jsonl_inform_check -i data/instruction/train/train_gangnam_samsung_video_violence.jsonl
+
+# 옵션 전체 설명 및 포맷 명세: docs/cleaning/label_to_jsonl.md
 
 # 필요 시 train/test JSONL 분리
 python main.py train_test_split -i data/instruction/train/train_total.jsonl -r 0.1 -o data/instruction
