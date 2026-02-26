@@ -212,7 +212,9 @@ data/instruction/*
 !data/instruction/test/
 data/instruction/test/*
 !data/instruction/test/sample_test.jsonl
-!data/instruction/test/sample_train.jsonl
+!data/instruction/train/
+data/instruction/train/*
+!data/instruction/train/sample_train.jsonl
 .qodo
 configs/gmail-361002-cbcf95afec4a.json
 !assets/edit_video.png
@@ -221,7 +223,7 @@ DUAL_VAD_ICCE_2025/
 IntenVL3_Violence_SFT
 *jsonl
 !data/instruction/test/sample_test.jsonl
-!data/instruction/test/sample_train.jsonl
+!data/instruction/train/sample_train.jsonl
 ckpts/*
 results/eval_result/*
 *.csv
