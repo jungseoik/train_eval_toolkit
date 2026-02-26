@@ -1,7 +1,7 @@
 import os
 from src.preprocess.video_splitter import preprocess_video_chunk_split_folder
 from configs.config_preprocess import INPUT_VIDEO_DIRECTORY, OUTPUT_CLIPS_DIRECTORY, CLIP_DURATION, NUM_CORES
-from src.autolabel.auto_labeler import autolabel_videos_recursively
+from src._autolabeling import autolabel_files_recursively, translate_descriptions_recursively
 import argparse
 
 
@@ -66,13 +66,10 @@ def run_preprocess(args): # 이제 각 함수는 args를 받을 수 있습니다
 
 def run_autolabel(args):
     """오토라벨 프로세스를 실행합니다."""
-    # INPUT_ROOT_DIR = "data/processed/violence_inside_elevator_clips_2sec"
-    # data/raw/rwf2000/RWF-2000/train/NonFight
-    # data/raw/rwf2000/RWF-2000/train/Fight
     FAILURE_LOG_DIR = "assets/logs"
-    
+
     print("--- Running Gemini Autolabeler ---")
-    autolabel_videos_recursively(
+    autolabel_files_recursively(
         input_folder=args.input_dir,
         failure_log_dir=FAILURE_LOG_DIR,
         num_workers=args.num_process,
@@ -80,6 +77,19 @@ def run_autolabel(args):
         mode=args.mode,
     )
     print("--- Autolabeling finished ---")
+
+
+def run_translate(args):
+    """JSON description 영→한 번역 프로세스를 실행합니다."""
+    FAILURE_LOG_DIR = "assets/logs"
+
+    print("--- Running JSON Description Translator ---")
+    translate_descriptions_recursively(
+        input_folder=args.input_dir,
+        failure_log_dir=FAILURE_LOG_DIR,
+        num_workers=args.num_process,
+    )
+    print("--- Translation finished ---")
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="main script with commands for video processing, train, eval")
@@ -106,7 +116,15 @@ if __name__ == '__main__':
     parser_autolabel.add_argument('-m','--mode', choices=['video', 'image'] , default='video',
                                  required=False, help='Labeling mode type'),
     parser_autolabel.set_defaults(func=run_autolabel)
-    
+
+    # --- 'translate' 서브 파서 ---
+    parser_translate = subparsers.add_parser('translate', help='Translate JSON description fields (English → Korean).')
+    parser_translate.add_argument('-i', '--input-dir', type=str, required=True,
+                                 help='Input directory containing JSON label files')
+    parser_translate.add_argument('-n', '--num_process', type=int, default=8,
+                                 required=False, help='Num processes')
+    parser_translate.set_defaults(func=run_translate)
+
     # --- 'jsonl_reindex_sorting' 서브 파서 ---
     parser_jsonl_reindex_sort = subparsers.add_parser('jsonl_reindex' , help="Run the jsonl reindex and id sorting")
     parser_jsonl_reindex_sort.add_argument('-i' , '--input_file' , type=str, required=True, help='Input JSONL file path')

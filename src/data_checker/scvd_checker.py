@@ -9,7 +9,7 @@ from typing import Optional, List
 from functools import partial
 from datetime import datetime
 
-from src.autolabel.gemini.gemini_api import GeminiImageAnalyzer
+from src._autolabeling.gemini.client import GeminiClient as GeminiImageAnalyzer
 from configs.config_gemini import GEMINI_MODEL_CONFIG, PROMPT_VIDEO
 from configs.config_gemini_scvd import PROMPT_VIDEO_CHECK_LABEL_SCVD
 from src.utils.json_parser import parse_json_from_response
