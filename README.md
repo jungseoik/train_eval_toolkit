@@ -33,7 +33,25 @@ flowchart LR
 
 ## 빠른 시작
 
-### 1) 환경 설치
+### 1) 필수 다운로드 (ckpts + data)
+
+```bash
+# Hugging Face CLI 설치 후 로그인 (최초 1회)
+curl -LsSf https://hf.co/cli/install.sh | bash
+hf auth login
+
+# Step 1: OpenGVLab/InternVL3-2B 폴더를 ckpts에 저장
+mkdir -p ckpts/InternVL3-2B
+hf download OpenGVLab/InternVL3-2B \
+  --repo-type=model \
+  --local-dir ckpts/InternVL3-2B
+```
+
+- Step 2 데이터 다운로드는 아래 가이드를 따르세요.
+- Gangnam: [docs/data/download/guideline_gangnam.md](docs/data/download/guideline_gangnam.md)
+- Hyundai Backhwajum: [docs/data/download/guideline_hyundai_backhwajum.md](docs/data/download/guideline_hyundai_backhwajum.md)
+
+### 2) 환경 설치
 
 **conda 환경 생성 (권장)**
 
@@ -57,7 +75,7 @@ pip install flash-attn==2.3.6 --no-build-isolation
 PYTHONPATH="$(pwd)" pytest tests/test_imports.py -v
 ```
 
-### 2) 오토라벨링 사전 설정
+### 3) 오토라벨링 사전 설정
 
 - Gemini 사용 시 `configs/config_gemini.py`의 모델/프로젝트 설정을 환경에 맞게 조정합니다.
 - 서비스 계정 키 경로, API 키 등 민감 정보는 코드/문서에 하드코딩하지 말고 로컬 환경 변수 또는 비공개 설정으로 관리하세요.
