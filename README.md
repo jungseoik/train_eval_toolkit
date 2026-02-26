@@ -27,7 +27,7 @@ flowchart LR
 | 데이터 수집 | 원본 데이터 정리/분할 | `main.py gj_split`, `main.py aihub_store_split`, `src/train_test_split_folder.py` | `main.py`, `src/preprocess/video_splitter.py`, `src/train_test_split_folder.py` |
 | 오토라벨링 | 영상/이미지 자동 라벨 생성 | `main.py autolabel` | [`docs/labeling/autolabeling.md`](docs/labeling/autolabeling.md) |
 | 데이터클리닝/검수 | 빈 라벨/분포/JSONL 품질 점검 | `empty_json_checker.py`, `json_category_stats.py`, `main.py jsonl_inform_check` | `src/data_checker/stats/empty_json_checker.py`, `src/stats/json_category_stats.py`, `src/utils/jsonl_inform_check.py` |
-| 학습 | InternVL 파인튜닝 | `scripts/shell/internvl3.0/*.sh` | `scripts/shell/internvl3.0/gangnam.sh` |
+| 학습 | InternVL 파인튜닝 | `scripts/shell/internvl3.0/*.sh` | [`docs/train/training.md`](docs/train/training.md) |
 | 평가 | 비디오/이미지 성능 평가 | `evaluate_video_classfication_edit.py`, `evaluate_image_classfication.py` | `src/evaluation/evaluate_video_classfication_edit.py`, `src/evaluation/evaluate_image_classfication.py` |
 | 배포 | LoRA 병합 후 추론용 체크포인트 생성 | `merge_lora.py` | `src/training/tools/merge_lora.py`, `scripts/pipe_line/train_eval_save_hyundai_8_20.sh` |
 
@@ -141,10 +141,15 @@ python main.py train_test_split -i data/instruction/train/train_total.jsonl -r 0
 대표 학습 스크립트:
 
 ```bash
-GPUS=2 PER_DEVICE_BATCH_SIZE=2 bash scripts/shell/internvl3.0/gangnam.sh
+# 단독 학습 + LoRA 병합
+GPUS=4 PER_DEVICE_BATCH_SIZE=2 bash scripts/shell/internvl3.0/train_sample_scripts.sh
+
+# 학습 + 평가 전체 파이프라인
+EPOCHS=20 GPUS=4 PER_DEVICE_BATCH_SIZE=2 bash scripts/pipe_line/train_eval_save_sample_scripts.sh
 ```
 
 - 메타데이터 입력은 스크립트 내 `--meta_path`(`scripts/shell/data/*.json`)로 제어합니다.
+- 상세 파라미터 설명 및 GPU 메모리 절약 팁: [docs/train/training.md](docs/train/training.md)
 
 ### 5) 평가
 
@@ -182,7 +187,7 @@ cp ckpts/InternVL3-2B/*.py ckpts/$MERGE_DIR/
 cp ckpts/InternVL3-2B/config.json ckpts/$MERGE_DIR/
 ```
 
-- 학습+평가+저장 파이프라인 예시는 `scripts/pipe_line/train_eval_save_hyundai_8_20.sh`를 참고하세요.
+- 학습+평가+저장 파이프라인 예시는 `scripts/pipe_line/train_eval_save_sample_scripts.sh`를 참고하세요.
 
 ## 실제 프로젝트 구조 (핵심)
 
