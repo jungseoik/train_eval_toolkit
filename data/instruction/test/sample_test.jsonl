@@ -1,1 +1,0 @@
-{"id": 0, "type": "capture_frame", "task": "caption", "image": "processed/ABB_banwoldang/PE/Test/falldown/image/falldown_00013.jpg", "conversations": [{"from": "gpt", "value": "{\"category\": \"falldown\", \"description\": \"On the left escalator of the two, a man has fallen with his head facing downwards. There are three people nearby. This appears to be an emergency.\"}"}]}
