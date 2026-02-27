@@ -1,9 +1,0 @@
-{
-    "HYUNDAI_IMAGE_GEN_AI_ONLY_SANGRAK_TEST": {
-      "root": "data/",
-      "annotation": "data/instruction/train/test_hyundai_image_gen_ai_only_sangrak_image_falldown.jsonl",
-      "data_augment": false,
-      "repeat_time": 1,
-      "length": 12
-    }
-}

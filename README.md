@@ -86,11 +86,12 @@ PYTHONPATH="$(pwd)" pytest tests/test_imports.py -v
 - Gemini 사용 시 `configs/config_gemini.py`의 모델/프로젝트 설정을 환경에 맞게 조정합니다.
 - 서비스 계정 키 경로, API 키 등 민감 정보는 코드/문서에 하드코딩하지 말고 로컬 환경 변수 또는 비공개 설정으로 관리하세요.
 
-## 단계별 실행 가이드 (핵심 런북)
+## 단계별 실행 가이드
 
-### 1) 데이터 수집/정리
+### 1) 데이터 수집/정리(레거시)
 
 원본 폴더를 학습 가능한 구조로 분할/정리합니다.
+해당 단계는 현재는 무시합니다.
 
 ```bash
 # Gangjin 포맷 비디오 분할
@@ -117,7 +118,7 @@ python main.py autolabel -i data/processed/gangnam/gaepo1_v2/Train/video/violenc
 python main.py autolabel -i data/processed/hyundai_backhwajum/abb_hyundai/train/falldown -opt hyundai_falldown -n 128 -m image
 ```
 
-- 지원 options 목록, 환경 설정, 번역 기능 등은 [autolabeling.md](docs/labeling/autolabeling.md)를 참조하세요.
+- 지원 options 목록, 환경 설정, 번역 기능 등은 [autolabeling 문서](docs/labeling/autolabeling.md)를 참조하세요.
 - 실패 항목은 `assets/logs/failed_videos_*.txt`에 기록됩니다.
 
 ### 3) 데이터클리닝(검수) + JSONL 생성
@@ -132,27 +133,39 @@ python src/stats/json_category_stats.py data/processed/gangnam
 
 > 라벨 → JSONL 변환 옵션 전체 설명: [docs/cleaning/label_to_jsonl.md](docs/cleaning/label_to_jsonl.md)
 
-Gangnam 데이터를 다운받아 압축 해제하면 `data/processed/gangnam/` 아래 `yeoksam2_v2/`, `gaepo1_v2/` 등의 구역 폴더가 생성됩니다. 각 구역 폴더 하위는 `Train/video/<category>/`, `Test/video/<category>/` 구조입니다.
+Gangnam 데이터를 다운받아 압축 해제하면 `data/processed/gangnam/` 아래 `yeoksam2_v2/`, `gaepo1_v2/` 등의 구역 폴더가 생성됩니다. 각 구역 폴더 하위는 `Train/video/<category>/`, `Test/video/<category>/`, `Train/image/<category>/`, `Test/image/<category>/` 구조입니다.
 
 ```bash
-# 학습용 JSONL 생성 (Train 폴더 기준)
+# [비디오] 학습용 JSONL 생성 (Train 폴더 기준)
 python main.py label2jsonl \
   -i data/processed/gangnam/yeoksam2_v2/Train/video/violence \
   -o data/instruction/train/train_gangnam_yeoksam2_v2_video_violence.jsonl \
   -dt video -opt train -ity clip -itk caption -tn violence
 
-# 평가용 JSONL 생성 (Test 폴더 기준)
+# [비디오] 평가용 JSONL 생성 (Test 폴더 기준)
 python main.py label2jsonl \
   -i data/processed/gangnam/yeoksam2_v2/Test/video/falldown \
   -o data/instruction/evaluation/test_gangnam_yeoksam2_v2_video_falldown.jsonl \
   -dt video -opt test -ity clip -itk caption -tn falldown
 
+# [이미지] 학습용 JSONL 생성 (Train 폴더 기준)
+python main.py label2jsonl \
+  -i data/processed/gangnam/yeoksam2_v2/Train/image/falldown \
+  -o data/instruction/train/train_gangnam_yeoksam2_v2_image_falldown.jsonl \
+  -dt image -opt train -ity capture_frame -itk caption -tn falldown
+
+# [이미지] 평가용 JSONL 생성 (Test 폴더 기준)
+python main.py label2jsonl \
+  -i data/processed/gangnam/yeoksam2_v2/Test/image/falldown \
+  -o data/instruction/evaluation/test_gangnam_yeoksam2_v2_image_falldown.jsonl \
+  -dt image -opt test -ity capture_frame -itk caption -tn falldown
+
 # JSONL 분포/유효성 점검
-python main.py jsonl_inform_check -i data/instruction/train/train_gangnam_yeoksam2_v2_video_violence.jsonl
+python main.py jsonl_inform_check -i data/instruction/train/train_gangnam_yeoksam2_v2_image_falldown.jsonl
 
 # 필요 시 train/test JSONL 분리
 python main.py train_test_split \
-  -i data/instruction/train/train_gangnam_yeoksam2_v2_video_violence.jsonl \
+  -i data/instruction/train/train_gangnam_yeoksam2_v2_image_falldown.jsonl \
   -r 0.1 -o data/instruction
 ```
 

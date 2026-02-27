@@ -1,5 +1,5 @@
 ## 기존 라벨링을 jsonl로 변환코드
-
+python main.py label2jsonl -i "data/processed/gangnam/yeoksam2_v2/Test/video/falldown" -o "data/instruction/train/train_gangnam_yeoksam2_v2_video_falldown.jsonl" -dt "video" -opt "test" -ity "clip" -itk "caption" -tn "falldown" 
 python main.py label2jsonl -i "data/processed/gangnam/yeoksam2_v2/Test/video/falldown" -o "data/instruction/evaluation/test_gangnam_yeoksam2_v2_video_falldown.jsonl" -dt "video" -opt "test" -ity "clip" -itk "caption" -tn "falldown" 
 python main.py label2jsonl -i "data/processed/gangnam/yeoksam2_v2/Test/video/violence" -o "data/instruction/evaluation/test_gangnam_yeoksam2_v2_video_violence.jsonl" -dt "video" -opt "test" -ity "clip" -itk "caption" -tn "violence" 
 

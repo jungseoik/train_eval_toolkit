@@ -1,7 +1,7 @@
 {
     "HYUNDAI_SAMPLE": {
       "root": "data/",
-      "annotation": "data/instruction/train/train_gangnam_yeoksam2_v2_image_falldown.jsonl",
+      "annotation": "data/instruction/train/sample_train.jsonl",
       "data_augment": false,
       "repeat_time": 1,
       "length": 544
