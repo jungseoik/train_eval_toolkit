@@ -81,7 +81,13 @@ pip install flash-attn==2.3.6 --no-build-isolation
 PYTHONPATH="$(pwd)" pytest tests/test_imports.py -v
 ```
 
-### 3) 오토라벨링 사전 설정
+### 3) 퀵스타트
+
+데이터 다운로드 및 환경 설치까지 완료됐다면 샘플 데이터(`gangnam_yeoksam2_v2_image_falldown`)로 학습부터 평가까지 바로 실행할 수 있습니다.
+
+> 상세 가이드: [docs/train/quick_start.md](docs/train/quick_start.md)
+
+### 4) 오토라벨링 사전 설정
 
 - Gemini 사용 시 `configs/config_gemini.py`의 모델/프로젝트 설정을 환경에 맞게 조정합니다.
 - 서비스 계정 키 경로, API 키 등 민감 정보는 코드/문서에 하드코딩하지 말고 로컬 환경 변수 또는 비공개 설정으로 관리하세요.
