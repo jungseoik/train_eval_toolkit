@@ -306,6 +306,7 @@ def label_to_jsonl_result_save(input_dir, output_file_path, mode="train", data_t
     my_dataset = create_final_dataset(input_dir, base_dir, mode=mode, data_type=data_type , item_type=item_type, item_task=item_task , task_name=task_name)
     if my_dataset:
             try:
+                Path(output_file_path).parent.mkdir(parents=True, exist_ok=True)
                 with open(output_file_path, 'w', encoding='utf-8') as f:
                     for entry in tqdm(my_dataset, desc="JSONL 파일 저장 중"):
                         f.write(json.dumps(entry, ensure_ascii=False) + '\n')
