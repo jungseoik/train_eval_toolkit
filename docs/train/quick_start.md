@@ -39,7 +39,23 @@ GPUS=4 PER_DEVICE_BATCH_SIZE=1 bash scripts/shell/internvl3.0/train_sample_scrip
 
 ---
 
-## Step 2 — 평가 실행
+## Step 2 — 베이스 모델 평가 (학습 전)
+
+> **반드시 베이스 모델을 먼저 측정하세요.** 학습 전후 성능 비교의 기준이 됩니다.
+
+```bash
+PYTHONPATH="$(pwd)" python src/evaluation/evaluate_image_classfication.py \
+  --checkpoint ckpts/InternVL3-2B \
+  --annotation data/instruction/evaluation/sample_test.jsonl \
+  --image-root data \
+  --out-dir results/eval_result_image/sample_base \
+  --batch-size 5 \
+  --multi-gpu
+```
+
+---
+
+## Step 3 — 학습 후 모델 평가
 
 ```bash
 PYTHONPATH="$(pwd)" python src/evaluation/evaluate_image_classfication.py \
@@ -51,7 +67,12 @@ PYTHONPATH="$(pwd)" python src/evaluation/evaluate_image_classfication.py \
   --multi-gpu
 ```
 
-평가 결과는 `results/eval_result_image/sample/` 에 저장됩니다.
+두 평가 결과를 비교해 파인튜닝 효과를 확인합니다.
+
+| 결과 경로 | 설명 |
+|---|---|
+| `results/eval_result_image/sample_base/` | 베이스 모델 평가 결과 |
+| `results/eval_result_image/sample/` | 학습 후 모델 평가 결과 |
 
 - `result_*.json` — 샘플별 예측 결과
 - `summary_*.txt` — Precision / Recall / F1 / Accuracy 요약
