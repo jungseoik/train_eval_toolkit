@@ -31,7 +31,8 @@ JSONL 변환이 이미 완료된 샘플 파일로 구성됩니다.
 bash scripts/shell/internvl3.0/train_sample_scripts.sh
 
 # GPU 수 / 배치 크기 조정
-GPUS=4 PER_DEVICE_BATCH_SIZE=2 bash scripts/shell/internvl3.0/train_sample_scripts.sh
+## a5000 기준 batch size 1로 설정하세요(세부 배치사이즈는 다릅니다)
+GPUS=4 PER_DEVICE_BATCH_SIZE=1 bash scripts/shell/internvl3.0/train_sample_scripts.sh
 ```
 
 학습 완료 후 LoRA 병합까지 자동으로 수행되며, 최종 체크포인트는 `ckpts/InternVL3-2B_sample/`에 저장됩니다.
@@ -46,7 +47,7 @@ PYTHONPATH="$(pwd)" python src/evaluation/evaluate_image_classfication.py \
   --annotation data/instruction/evaluation/sample_test.jsonl \
   --image-root data \
   --out-dir results/eval_result_image/sample \
-  --batch-size 20 \
+  --batch-size 5 \
   --multi-gpu
 ```
 
