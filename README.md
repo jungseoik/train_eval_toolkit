@@ -108,10 +108,11 @@ python main.py autolabel -i data/processed/hyundai_backhwajum/abb_hyundai/train/
 ### 2) 데이터클리닝(검수) + JSONL 생성
 
 ```bash
-# JSON 라벨 점검 (빈 clips + 카테고리 분포 통합)
+# JSON 라벨 점검 (빈 clips + 카테고리 분포 통합, 하위 폴더 재귀 탐색)
 python main.py data_check -i data/processed/gangnam -t json
 ```
 
+> 출력 예시 및 옵션 상세: [docs/cleaning/data_check.md](docs/cleaning/data_check.md)
 > 라벨 → JSONL 변환 옵션 전체 설명: [docs/cleaning/label_to_jsonl.md](docs/cleaning/label_to_jsonl.md)
 
 Gangnam 데이터를 다운받아 압축 해제하면 `data/processed/gangnam/` 아래 `yeoksam2_v2/`, `gaepo1_v2/` 등의 구역 폴더가 생성됩니다. 각 구역 폴더 하위는 `Train/video/<category>/`, `Test/video/<category>/`, `Train/image/<category>/`, `Test/image/<category>/` 구조입니다.
