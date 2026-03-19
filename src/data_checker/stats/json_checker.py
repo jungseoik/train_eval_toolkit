@@ -1,8 +1,7 @@
 """
-JSON 라벨 파일 점검 통합 모듈.
+JSON 라벨 파일 카테고리 분포 점검 모듈.
 
-- 빈 clips 점검 (empty_json_checker 기능)
-- 카테고리 분포 점검 (json_category_stats 기능)
+하위 폴더를 재귀 탐색하며 카테고리 분포 통계 및 낮은 비율 카테고리를 탐지한다.
 
 사용법:
     from src.data_checker.stats.json_checker import check_json_directory
@@ -14,39 +13,7 @@ from __future__ import annotations
 import json
 import os
 from collections import defaultdict
-from pathlib import Path
 from typing import Dict, List, Tuple
-
-
-def _check_empty_clips_in_dir(directory: str) -> Tuple[int, int, List[Tuple[str, str]]]:
-    """
-    디렉토리 내 JSON 파일에서 clips가 비어있는 파일을 찾는다.
-
-    Returns:
-        (empty_count, total_count, [(파일명, 절대경로), ...])
-    """
-    empty_count = 0
-    total_count = 0
-    empty_files = []
-
-    for entry in os.listdir(directory):
-        if not entry.endswith(".json"):
-            continue
-        full_path = os.path.join(directory, entry)
-        if not os.path.isfile(full_path):
-            continue
-
-        total_count += 1
-        try:
-            with open(full_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            if "clips" in data and len(data["clips"]) == 0:
-                empty_count += 1
-                empty_files.append((entry, os.path.abspath(full_path)))
-        except (json.JSONDecodeError, KeyError, FileNotFoundError) as e:
-            print(f"  [WARN] {entry}: {e}")
-
-    return empty_count, total_count, empty_files
 
 
 def _get_category_stats_in_dir(directory: str) -> Dict[str, int]:
@@ -74,10 +41,7 @@ def _get_category_stats_in_dir(directory: str) -> Dict[str, int]:
 
 def check_json_directory(target_path: str, low_threshold: float = 0.49) -> None:
     """
-    대상 경로를 재귀 탐색하며 JSON 라벨 파일을 점검한다.
-
-    1) 빈 clips 파일 점검
-    2) 카테고리 분포 통계 + 낮은 비율 카테고리 탐지
+    대상 경로를 재귀 탐색하며 JSON 라벨 파일의 카테고리 분포를 점검한다.
 
     Args:
         target_path: 점검할 최상위 디렉토리 경로.
@@ -93,25 +57,16 @@ def check_json_directory(target_path: str, low_threshold: float = 0.49) -> None:
     print(f"  JSON 라벨 점검 시작: {abs_path}")
     print("=" * 60)
 
-    # 전체 집계
-    total_empty = 0
     total_json = 0
-    all_empty_files: List[Tuple[str, str]] = []
     low_proportion_files: Dict[str, List[Tuple[str, str]]] = defaultdict(list)
 
     for root, _dirs, _files in os.walk(abs_path):
-        # --- 1) 빈 clips 점검 ---
-        empty_count, dir_total, empty_files = _check_empty_clips_in_dir(root)
-        total_empty += empty_count
-        total_json += dir_total
-        all_empty_files.extend(empty_files)
-
-        # --- 2) 카테고리 분포 점검 ---
         category_counts = _get_category_stats_in_dir(root)
         if not category_counts:
             continue
 
         total_in_dir = sum(category_counts.values())
+        total_json += total_in_dir
         proportions = {
             cat: cnt / total_in_dir for cat, cnt in category_counts.items()
         }
@@ -142,7 +97,6 @@ def check_json_directory(target_path: str, low_threshold: float = 0.49) -> None:
                     continue
 
         # 폴더별 통계 출력
-        folder_name = os.path.basename(root) if root != abs_path else abs_path
         rel_path = os.path.relpath(root, abs_path)
 
         print(f"\n  [{rel_path}] JSON {total_in_dir}개")
@@ -157,24 +111,8 @@ def check_json_directory(target_path: str, low_threshold: float = 0.49) -> None:
     print("  점검 결과 요약")
     print("=" * 60)
 
-    # 빈 clips 요약
-    print(f"\n  [빈 clips 점검]")
-    print(f"  총 JSON 파일: {total_json}개")
-    print(f"  빈 clips 파일: {total_empty}개", end="")
-    if total_json > 0:
-        print(f" ({total_empty / total_json * 100:.1f}%)")
-    else:
-        print()
+    print(f"\n  총 JSON 파일: {total_json}개")
 
-    if all_empty_files:
-        show = all_empty_files[:10]
-        for name, path in show:
-            print(f"    - {name}")
-            print(f"      {path}")
-        if len(all_empty_files) > 10:
-            print(f"    ... 외 {len(all_empty_files) - 10}개")
-
-    # 낮은 비율 카테고리 요약
     if low_proportion_files:
         print(f"\n  [낮은 비율 카테고리] (기준: < {low_threshold * 100:.0f}%)")
         for cat, file_list in low_proportion_files.items():

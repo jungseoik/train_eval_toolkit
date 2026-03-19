@@ -108,7 +108,7 @@ python main.py autolabel -i data/processed/hyundai_backhwajum/abb_hyundai/train/
 ### 2) 데이터클리닝(검수) + JSONL 생성
 
 ```bash
-# JSON 라벨 점검 (빈 clips + 카테고리 분포 통합, 하위 폴더 재귀 탐색)
+# JSON 라벨 카테고리 분포 점검 (하위 폴더 재귀 탐색)
 python main.py data_check -i data/processed/gangnam -t json
 ```
 
