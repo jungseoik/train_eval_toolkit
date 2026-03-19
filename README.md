@@ -4,13 +4,11 @@
 
 ```mermaid
 flowchart LR
-    A[데이터 수집] --> B[오토라벨링]
-    B --> C[데이터클리닝/검수]
+    B[오토라벨링] --> C[데이터클리닝/검수]
     C --> D[학습]
     D --> E[평가]
     E --> F[배포]
 
-    A -. 사용 도구 .-> A1[video split / folder split]
     B -. 사용 도구 .-> B1[main.py autolabel]
     C -. 사용 도구 .-> C1[empty_json_checker / category stats / jsonl inform]
     D -. 사용 도구 .-> D1[internvl3.0 학습 스크립트]
@@ -18,13 +16,12 @@ flowchart LR
     F -. 사용 도구 .-> F1[merge_lora + 추론용 checkpoint]
 ```
 
-이 저장소는 `데이터 수집 -> 오토라벨링 -> 데이터클리닝(검수) -> 학습 -> 평가 -> 배포` 각 단계를 위한 도구 모음입니다.
+이 저장소는 `오토라벨링 -> 데이터클리닝(검수) -> 학습 -> 평가 -> 배포` 각 단계를 위한 도구 모음입니다. 데이터 수집은 별도로 진행합니다.
 
 ## 단계별 도구 매핑
 
 | 단계 | 핵심 작업 | 주요 도구/명령 | 근거 파일 |
 |---|---|---|---|
-| 데이터 수집 | 원본 데이터 정리/분할 | `main.py gj_split`, `main.py aihub_store_split`, `src/train_test_split_folder.py` | `main.py`, `src/preprocess/video_splitter.py`, `src/train_test_split_folder.py` |
 | 오토라벨링 | 영상/이미지 자동 라벨 생성 | `main.py autolabel` | [`docs/labeling/autolabeling.md`](docs/labeling/autolabeling.md) |
 | 데이터클리닝/검수 | 빈 라벨/분포/JSONL 품질 점검 | `empty_json_checker.py`, `json_category_stats.py`, `main.py jsonl_inform_check` | `src/data_checker/stats/empty_json_checker.py`, `src/stats/json_category_stats.py`, `src/utils/jsonl_inform_check.py` |
 | 데이터클리닝/검수 | JSON 라벨 → 학습/평가용 JSONL 변환 | `main.py label2jsonl` | [`docs/cleaning/label_to_jsonl.md`](docs/cleaning/label_to_jsonl.md) |
@@ -90,23 +87,7 @@ PYTHONPATH="$(pwd)" pytest tests/test_imports.py -v
 
 ## 단계별 실행 가이드
 
-### 1) 데이터 수집/정리(레거시)
-
-원본 폴더를 학습 가능한 구조로 분할/정리합니다.
-해당 단계는 현재는 무시합니다.
-
-```bash
-# Gangjin 포맷 비디오 분할
-python main.py gj_split -i data/raw/gj -o data/processed/gj -p 16
-
-# AIHub Store 포맷 비디오 분할
-python main.py aihub_store_split -i data/raw/aihub_store -o data/processed/aihub_store -p 16
-
-# media+json 쌍 기준 train/test 폴더 분리
-python src/train_test_split_folder.py -i data/processed/hyundai_backhwajum/hyundai_PoC_5camera_gen_ai -r 0.1
-```
-
-### 2) 오토라벨링
+### 1) 오토라벨링
 
 > 상세 내용: [docs/labeling/autolabeling.md](docs/labeling/autolabeling.md)
 
@@ -123,7 +104,7 @@ python main.py autolabel -i data/processed/hyundai_backhwajum/abb_hyundai/train/
 - 지원 options 목록, 환경 설정, 번역 기능 등은 [autolabeling 문서](docs/labeling/autolabeling.md)를 참조하세요.
 - 실패 항목은 `assets/logs/failed_videos_*.txt`에 기록됩니다.
 
-### 3) 데이터클리닝(검수) + JSONL 생성
+### 2) 데이터클리닝(검수) + JSONL 생성
 
 ```bash
 # 빈 JSON(clips) 점검
@@ -171,7 +152,7 @@ python main.py train_test_split \
   -r 0.1 -o data/instruction
 ```
 
-### 4) 학습
+### 3) 학습
 
 > **학습 전 3단계 준비가 필요합니다.** 자세한 내용: [docs/train/pre_training_checklist.md](docs/train/pre_training_checklist.md)
 >
@@ -192,9 +173,9 @@ EPOCHS=20 GPUS=4 PER_DEVICE_BATCH_SIZE=2 bash scripts/pipe_line/train_eval_save_
 - 학습 전 체크리스트: [docs/train/pre_training_checklist.md](docs/train/pre_training_checklist.md)
 - 상세 파라미터 설명 및 GPU 메모리 절약 팁: [docs/train/training.md](docs/train/training.md)
 
-### 5) 평가
+### 4) 평가
 
-#### 5-1) 이미지 분류 정량 평가
+#### 4-1) 이미지 분류 정량 평가
 
 JSONL 어노테이션 기반으로 Precision / Recall / F1 을 산출합니다.
 
@@ -211,7 +192,7 @@ PYTHONPATH="$(pwd)" python src/evaluation/evaluate_image_classfication.py \
 > 참조 스크립트: `scripts/eval/eval_image_falldown/eval.sh`
 > 상세 가이드: [docs/eval/eval_image_falldown.md](docs/eval/eval_image_falldown.md)
 
-#### 5-2) 비디오 정성 평가 (Threshold + 이미지 오버레이)
+#### 4-2) 비디오 정성 평가 (Threshold + 이미지 오버레이)
 
 슬라이딩 윈도우로 비디오를 추론하고 판정 결과를 프레임에 오버레이한 영상을 저장합니다.
 
@@ -229,7 +210,7 @@ PYTHONPATH="$(pwd)" python src/evaluation/evaluate_qualitative_video_threshold_i
 > 참조 스크립트: `scripts/eval/eval_quality/eval.sh`
 > 상세 가이드: [docs/eval/eval_quality.md](docs/eval/eval_quality.md)
 
-#### 5-3) 비디오 정량 평가 (torchrun)
+#### 4-3) 비디오 정량 평가 (torchrun)
 
 ```bash
 PYTHONPATH="$(pwd)" torchrun --nproc_per_node=2 src/evaluation/evaluate_video_classfication_edit.py \
@@ -242,7 +223,7 @@ PYTHONPATH="$(pwd)" torchrun --nproc_per_node=2 src/evaluation/evaluate_video_cl
   --prompt-type violence
 ```
 
-### 6) 배포 (체크포인트 배포)
+### 5) 배포 (체크포인트 배포)
 
 이 저장소에서 배포는 서버 서빙이 아니라, **LoRA 병합 후 추론 가능한 체크포인트를 생성해 배포 가능한 상태로 만드는 것**을 의미합니다.
 

@@ -22,21 +22,9 @@ from src.utils.jsonl_inform_check import print_dataset_info
 def run_jsonl_inform_check(args):
     print_dataset_info(args.files)
 
-################################################################################################
-from src.preprocess.gj.gj_split import process_videos_clips
-def run_gj_video_split(args):
-    source_dir = args.input_dir
-    output_dir = args.output_dir
-    num_processes = args.num_processes
-    process_videos_clips(source_dir , output_dir, num_processes)
-
 from src.preprocess.train_test_split import split_dataset_final
 def run_split_train_test_dataset(args):
     split_dataset_final(args.input_file , args.ratio, args.output_dir)
-        
-from src.preprocess.aihub.store.aihub_store_split import process_videos_clips_aihub_store
-def run_aihub_store_video_split(args):
-    process_videos_clips_aihub_store(args.input_dir, args.output_dir, args.num_processes)
 from src.preprocess.label2jsonl import label_to_jsonl_result_save
 def run_label_to_jsonl(args):
      label_to_jsonl_result_save(
@@ -168,19 +156,6 @@ if __name__ == '__main__':
 
     parser_json_inform_check.set_defaults(func=run_jsonl_inform_check)    
 
-    ####################################################################################################################################
-
-
-    # --- 'gj_split_video' 서브 파서 ---
-    parser_gj_split = subparsers.add_parser('gj_split', help="split video ,Only gang-jin labeling format")
-    parser_gj_split.add_argument('-i', '--input_dir', type=str, required=True,
-                            help='Input directory containing video & label')
-    parser_gj_split.add_argument('-o', '--output_dir', type=str, required=True,
-                            help='Output save clip directory path')
-    parser_gj_split.add_argument('-p', '--num_processes', type=int, required=True,
-                            help='Number of processes to use for parallel processing')
-    parser_gj_split.set_defaults(func=run_gj_video_split)
-
     # --- 'train_test_split' 서브 파서 ---
     parser_train_test_split = subparsers.add_parser('train_test_split', help="split video ,Only gang-jin labeling format")
     parser_train_test_split.add_argument('-i', '--input_file', type=str, required=True,
@@ -190,18 +165,6 @@ if __name__ == '__main__':
     parser_train_test_split.add_argument('-o', '--output_dir', type=str, required=True,
                             help='train, test jsonl file save path ')
     parser_train_test_split.set_defaults(func=run_split_train_test_dataset)
-
-    # --- 'aihub_store_split_video' 서브 파서 ---
-    aihub_store_split_video = subparsers.add_parser('aihub_store_split', help="split video ,Only aihub-store labeling format")
-    aihub_store_split_video.add_argument('-i', '--input_dir', type=str, required=True,
-                            help='Input directory containing video & label')
-    aihub_store_split_video.add_argument('-o', '--output_dir', type=str, required=True,
-                            help='Output save clip directory path')
-    aihub_store_split_video.add_argument('-p', '--num_processes', type=int, required=True,
-                            help='Number of processes to use for parallel processing')
-    aihub_store_split_video.set_defaults(func=run_aihub_store_video_split)
-
-
 
     args = parser.parse_args()
     args.func(args)
