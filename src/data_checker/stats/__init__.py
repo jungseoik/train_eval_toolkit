@@ -1,5 +1,5 @@
 """
-JSONL 통계 관련 유틸 모듈.
+데이터 점검/통계 유틸 모듈.
 """
 
-from .jsonl_analyzer import analyze_jsonl_folder, analyze_jsonl_file  # noqa: F401
+from .json_checker import check_json_directory  # noqa: F401
