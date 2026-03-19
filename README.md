@@ -28,6 +28,7 @@ flowchart LR
 | 학습 | InternVL 파인튜닝 | `scripts/shell/internvl3.0/*.sh` | [`docs/train/training.md`](docs/train/training.md) |
 | 평가 | 비디오/이미지 정량 평가 | `evaluate_video_classfication_edit.py`, `evaluate_image_classfication.py` | [`docs/eval/eval_image_falldown.md`](docs/eval/eval_image_falldown.md) |
 | 평가 | 비디오 정성 평가 (threshold + 오버레이) | `evaluate_qualitative_video_threshold_image.py` | [`docs/eval/eval_quality.md`](docs/eval/eval_quality.md) |
+| 평가 | vLLM 자동화 파이프라인 (Docker→평가→제출) | `python -m src.vllm_pipeline.cli` | [`docs/eval/vllm_pipeline.md`](docs/eval/vllm_pipeline.md) |
 | 배포 | LoRA 병합 후 추론용 체크포인트 생성 | `merge_lora.py` | `src/training/tools/merge_lora.py`, `scripts/pipe_line/train_eval_save_hyundai_8_20.sh` |
 
 ## 빠른 시작
@@ -223,6 +224,20 @@ PYTHONPATH="$(pwd)" torchrun --nproc_per_node=2 src/evaluation/evaluate_video_cl
   --prompt-type violence
 ```
 
+#### 4-4) vLLM 자동화 파이프라인 (Docker → 평가 → 제출)
+
+YAML 설정 하나로 Docker 컨테이너 기동부터 벤치마크 평가, 결과 제출, 컨테이너 정리까지 자동 실행합니다.
+
+```bash
+conda activate llm
+python -m src.vllm_pipeline.cli -c configs/vllm_pipeline/qwen35_2b_fire.yaml
+
+# 특정 단계만 실행
+python -m src.vllm_pipeline.cli -c configs/vllm_pipeline/qwen35_2b_fire.yaml --steps evaluate submit
+```
+
+> 상세 가이드: [docs/eval/vllm_pipeline.md](docs/eval/vllm_pipeline.md)
+
 ### 5) 배포 (체크포인트 배포)
 
 이 저장소에서 배포는 서버 서빙이 아니라, **LoRA 병합 후 추론 가능한 체크포인트를 생성해 배포 가능한 상태로 만드는 것**을 의미합니다.
@@ -253,6 +268,7 @@ cp ckpts/InternVL3-2B/config.json ckpts/$MERGE_DIR/
 │   ├── _autolabeling/          # Gemini 기반 오토라벨링 (docs/labeling/autolabeling.md)
 │   ├── data_checker/           # 데이터 점검
 │   ├── evaluation/             # 정량/정성 평가
+│   ├── vllm_pipeline/          # vLLM 자동화 파이프라인 (Docker→평가→제출)
 │   └── training/               # InternVL 학습/모델/도구
 ├── main.py                     # 통합 CLI 엔트리포인트
 ├── requirements.txt
