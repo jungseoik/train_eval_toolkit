@@ -1,6 +1,6 @@
-# data_check - JSON 라벨 통합 점검
+# data_check - JSON 라벨 카테고리 분포 점검
 
-하위 폴더를 재귀 탐색하며 JSON 라벨 파일의 품질을 한번에 점검합니다.
+하위 폴더를 재귀 탐색하며 JSON 라벨 파일의 카테고리 분포를 점검합니다.
 
 ## 사용법
 
@@ -25,12 +25,6 @@ python main.py data_check -i data/instruction/train/train.jsonl -t jsonl
 
 ## 점검 항목 (json 모드)
 
-### 빈 clips 점검
-
-`clips` 키가 빈 배열(`[]`)인 JSON 파일을 찾아 경로와 함께 출력합니다. 오토라벨링 실패 등으로 내용 없는 라벨이 남아있는 경우를 탐지합니다.
-
-### 카테고리 분포 점검
-
 폴더별 `category` 값의 비율을 계산하고, 기준(기본 49%) 미만인 카테고리를 경고 표시합니다. 데이터 불균형을 사전에 파악할 수 있습니다.
 
 ## 출력 예시
@@ -48,11 +42,7 @@ python main.py data_check -i data/instruction/train/train.jsonl -t jsonl
   점검 결과 요약
 ============================================================
 
-  [빈 clips 점검]
   총 JSON 파일: 120개
-  빈 clips 파일: 3개 (2.5%)
-    - sample_001.json
-      /path/to/sample_001.json
 
   [낮은 비율 카테고리] (기준: < 49%)
     카테고리: NORMAL (22개)
