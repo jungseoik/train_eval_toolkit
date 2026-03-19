@@ -1,0 +1,61 @@
+pipeline:
+  name: "Qwen3.5-2B Fire Benchmark"
+  steps:
+    docker: true
+    evaluate: true
+    submit: true
+  cleanup_docker: true
+
+retry:
+  max_attempts: 3
+  wait_seconds: 30
+
+# ── Docker 설정 ──
+docker:
+  container_name: "qwen35_2b_mm_80g"
+  image: "vllm/vllm-openai:cu130-nightly"
+  gpus: "all"
+  port: 8000
+  ipc: "host"
+  volumes:
+    - "~/.cache/huggingface:/root/.cache/huggingface"
+  model: "Qwen/Qwen3.5-2B"
+  vllm_args:
+    tensor-parallel-size: 1
+    max-model-len: 8192
+    kv-cache-memory-bytes: "70G"
+    max-num-seqs: 128
+    max-num-batched-tokens: 131072
+    limit-mm-per-prompt: '{"image": 1}'
+    seed: 0
+  startup:
+    timeout_seconds: 300
+    poll_interval_seconds: 5
+    stream_logs: true
+
+# ── 평가 설정 ──
+evaluate:
+  eval_config_path: "configs/vllm_eval/config.py"
+  benchmarks:
+    - "PIA_Fire"
+    - "SamsungCNT_Fire"
+    - "Soil_Fire"
+    - "Hyundai_Fire"
+    - "Coupang_Fire"
+    - "Kumho_Fire"
+  overrides:
+    MODEL: "Qwen/Qwen3.5-2B"
+    RUN_NAME: "Qwen3_5-2B"
+    WINDOW_SIZE: 15
+    CONCURRENCY: 10
+    API_BASE: "http://127.0.0.1:8000/v1"
+
+# ── 제출 설정 ──
+submit:
+  gradio_url: "http://172.168.47.39:7860/"
+  model_name: "Qwen3_5-2B"
+  task_name: "🌠 VLM 🖥️"
+  datasets_used: "Pretrained"
+  config_file: "config.json"
+  results_base_dir: "results/vllm_eval"
+  interval_seconds: 60
