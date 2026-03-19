@@ -1,14 +1,12 @@
-# python src/stats/json_category_stats.py data/processed/gangnam/yeoksam2_v2
-python src/stats/json_category_stats.py data/processed/hyundai_backhwajum
+# python main.py data_check -i data/processed/gangnam/yeoksam2_v2 -t json
+python main.py data_check -i data/processed/hyundai_backhwajum -t json
 
-python src/stats/json_category_stats.py data/processed/hyundai_backhwajum/hyundai_image_gen_ai_1st
-python src/stats/json_category_stats.py data/processed/hyundai_backhwajum/hyundai_PoC_5camera_gen_ai
-python src/stats/json_category_stats.py data/processed/hyundai_backhwajum/hyundai_PoC_25camera_capture
+python main.py data_check -i data/processed/hyundai_backhwajum/hyundai_image_gen_ai_1st -t json
+python main.py data_check -i data/processed/hyundai_backhwajum/hyundai_PoC_5camera_gen_ai -t json
+python main.py data_check -i data/processed/hyundai_backhwajum/hyundai_PoC_25camera_capture -t json
 
-python src/stats/json_category_stats.py data/processed/hyundai_backhwajum/hyundai_image_gen_ai_only_sangrak
-python src/stats/json_category_stats.py data/processed/hyundai_backhwajum/hyundai_hard_negative_2st
+python main.py data_check -i data/processed/hyundai_backhwajum/hyundai_image_gen_ai_only_sangrak -t json
+python main.py data_check -i data/processed/hyundai_backhwajum/hyundai_hard_negative_2st -t json
 
-python src/stats/json_category_stats.py data/processed/hyundai_backhwajum/hyundai_01_16_QA
-python src/stats/json_category_stats.py data/processed/hyundai_backhwajum/hyundai_01_27_QA
-
-
+python main.py data_check -i data/processed/hyundai_backhwajum/hyundai_01_16_QA -t json
+python main.py data_check -i data/processed/hyundai_backhwajum/hyundai_01_27_QA -t json

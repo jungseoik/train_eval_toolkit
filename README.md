@@ -10,7 +10,7 @@ flowchart LR
     E --> F[배포]
 
     B -. 사용 도구 .-> B1[main.py autolabel]
-    C -. 사용 도구 .-> C1[empty_json_checker / category stats / jsonl inform]
+    C -. 사용 도구 .-> C1[main.py data_check / jsonl_inform_check]
     D -. 사용 도구 .-> D1[internvl3.0 학습 스크립트]
     E -. 사용 도구 .-> E1[video/image evaluation 스크립트]
     F -. 사용 도구 .-> F1[merge_lora + 추론용 checkpoint]
@@ -23,7 +23,7 @@ flowchart LR
 | 단계 | 핵심 작업 | 주요 도구/명령 | 근거 파일 |
 |---|---|---|---|
 | 오토라벨링 | 영상/이미지 자동 라벨 생성 | `main.py autolabel` | [`docs/labeling/autolabeling.md`](docs/labeling/autolabeling.md) |
-| 데이터클리닝/검수 | 빈 라벨/분포/JSONL 품질 점검 | `empty_json_checker.py`, `json_category_stats.py`, `main.py jsonl_inform_check` | `src/data_checker/stats/empty_json_checker.py`, `src/stats/json_category_stats.py`, `src/utils/jsonl_inform_check.py` |
+| 데이터클리닝/검수 | 빈 라벨/분포/JSONL 품질 점검 | `main.py data_check`, `main.py jsonl_inform_check` | `src/data_checker/stats/json_checker.py`, `src/utils/jsonl_inform_check.py` |
 | 데이터클리닝/검수 | JSON 라벨 → 학습/평가용 JSONL 변환 | `main.py label2jsonl` | [`docs/cleaning/label_to_jsonl.md`](docs/cleaning/label_to_jsonl.md) |
 | 학습 | InternVL 파인튜닝 | `scripts/shell/internvl3.0/*.sh` | [`docs/train/training.md`](docs/train/training.md) |
 | 평가 | 비디오/이미지 정량 평가 | `evaluate_video_classfication_edit.py`, `evaluate_image_classfication.py` | [`docs/eval/eval_image_falldown.md`](docs/eval/eval_image_falldown.md) |
@@ -108,11 +108,8 @@ python main.py autolabel -i data/processed/hyundai_backhwajum/abb_hyundai/train/
 ### 2) 데이터클리닝(검수) + JSONL 생성
 
 ```bash
-# 빈 JSON(clips) 점검
-python src/data_checker/stats/empty_json_checker.py --json_dir data/processed/gangnam
-
-# 카테고리 분포 점검
-python src/stats/json_category_stats.py data/processed/gangnam
+# JSON 라벨 점검 (빈 clips + 카테고리 분포 통합)
+python main.py data_check -i data/processed/gangnam -t json
 ```
 
 > 라벨 → JSONL 변환 옵션 전체 설명: [docs/cleaning/label_to_jsonl.md](docs/cleaning/label_to_jsonl.md)
@@ -288,7 +285,7 @@ cp ckpts/InternVL3-2B/config.json ckpts/$MERGE_DIR/
 - 서비스 계정 키 경로, API 키, 내부 절대 경로를 저장소에 커밋하지 마세요.
 - `configs/config_gemini.py` 등 설정 파일은 환경별로 분리해 관리하세요.
 - 대용량 데이터/체크포인트는 Git 대신 별도 스토리지(예: NAS, 오브젝트 스토리지) 사용을 권장합니다.
-- 학습 전 `jsonl_inform_check`, `json_category_stats`로 데이터 품질을 먼저 확인하세요.
+- 학습 전 `main.py data_check`, `main.py jsonl_inform_check`로 데이터 품질을 먼저 확인하세요.
 
 ## 테스트
 

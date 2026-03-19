@@ -22,6 +22,14 @@ from src.utils.jsonl_inform_check import print_dataset_info
 def run_jsonl_inform_check(args):
     print_dataset_info(args.files)
 
+from src.data_checker.stats.json_checker import check_json_directory
+def run_data_check(args):
+    """데이터 점검을 실행합니다. JSON 디렉토리 또는 JSONL 파일을 점검합니다."""
+    if args.type == "json":
+        check_json_directory(args.input, low_threshold=args.threshold)
+    elif args.type == "jsonl":
+        print_dataset_info(args.input if isinstance(args.input, list) else [args.input])
+
 from src.preprocess.train_test_split import split_dataset_final
 def run_split_train_test_dataset(args):
     split_dataset_final(args.input_file , args.ratio, args.output_dir)
@@ -149,12 +157,20 @@ if __name__ == '__main__':
 
     parser_label_to_jsonl.set_defaults(func=run_label_to_jsonl)    
     
-    # --- 'jsonl_information_check' 서브 파서 ---
-    # remove_human_video_prompts("data/instruction/evaluation/test_rwf2000.jsonl")
+    # --- 'jsonl_information_check' 서브 파서 (하위 호환) ---
     parser_json_inform_check = subparsers.add_parser('jsonl_inform_check', help="jsonl information check")
     parser_json_inform_check.add_argument('-i', "--files",nargs='+', help='분석할 JSONL 파일 경로 (여러 개 가능)', required=True)
+    parser_json_inform_check.set_defaults(func=run_jsonl_inform_check)
 
-    parser_json_inform_check.set_defaults(func=run_jsonl_inform_check)    
+    # --- 'data_check' 서브 파서 (통합 데이터 점검) ---
+    parser_data_check = subparsers.add_parser('data_check', help="JSON 라벨/JSONL 데이터 통합 점검")
+    parser_data_check.add_argument('-i', '--input', type=str, required=True,
+                                   help='점검할 디렉토리(json) 또는 파일 경로(jsonl)')
+    parser_data_check.add_argument('-t', '--type', choices=['json', 'jsonl'], required=True,
+                                   help='점검 유형: json(라벨 디렉토리), jsonl(어노테이션 파일)')
+    parser_data_check.add_argument('--threshold', type=float, default=0.49,
+                                   help='낮은 비율 카테고리 기준값 (기본: 0.49)')
+    parser_data_check.set_defaults(func=run_data_check)
 
     # --- 'train_test_split' 서브 파서 ---
     parser_train_test_split = subparsers.add_parser('train_test_split', help="split video ,Only gang-jin labeling format")
