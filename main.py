@@ -38,9 +38,9 @@ def run_label_to_jsonl(args):
      label_to_jsonl_result_save(
          input_dir=args.input_dir,
          output_file_path=args.output_file,
-         mode=args.option,
+         mode=args.mode,
          data_type=args.data_type,
-         base_dir="data/",
+         base_dir=args.base_dir,
          item_type=args.item_type,
          item_task=args.item_task,
          task_name=args.task_name,
@@ -144,16 +144,18 @@ if __name__ == '__main__':
                             help='A directory containing labels')
     parser_label_to_jsonl.add_argument('-o', '--output_file', type=str, required=True,
                             help='Location of jsonl file to save') 
-    parser_label_to_jsonl.add_argument('-opt', '--option', default="train", type=str, required=False,
-                            help='train or test extract mode select') 
-    parser_label_to_jsonl.add_argument('-dt', '--data_type', default="video", type=str, required=False,
-                            help='image or video type select') 
-    parser_label_to_jsonl.add_argument('-ity', '--item_type', default="clip", type=str, required=False,
-                            help='item type select , clip or capture_frame') 
-    parser_label_to_jsonl.add_argument('-itk', '--item_task', default="caption", type=str, required=False,
-                            help='item task select , caption or other')
-    parser_label_to_jsonl.add_argument('-tn', '--task_name', default="violence", type=str, required=False,      
-                                help='task name , violence , falldown , etc')
+    parser_label_to_jsonl.add_argument('-opt', '--mode', default="train", type=str,
+                            help='변환 모드 (train: 학습용, test: 평가용)')
+    parser_label_to_jsonl.add_argument('-dt', '--data_type', default="video", type=str,
+                            help='미디어 타입 (video / image)')
+    parser_label_to_jsonl.add_argument('-ity', '--item_type', default="clip", type=str,
+                            help='JSONL type 필드값 (예: clip, capture_frame)')
+    parser_label_to_jsonl.add_argument('-itk', '--item_task', default="caption", type=str,
+                            help='JSONL task 필드값 (예: caption)')
+    parser_label_to_jsonl.add_argument('-tn', '--task_name', default="violence", type=str,
+                            help='분류 작업명 — 프롬프트 선택 키 (예: violence, falldown)')
+    parser_label_to_jsonl.add_argument('--base-dir', default="data/", type=str,
+                            help='미디어 상대 경로 기준 디렉토리 (기본: data/)')
 
     parser_label_to_jsonl.set_defaults(func=run_label_to_jsonl)    
     
