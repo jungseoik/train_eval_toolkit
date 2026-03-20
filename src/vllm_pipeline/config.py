@@ -30,9 +30,21 @@ class DockerConfig:
 
 @dataclass
 class EvalConfig:
-    eval_config_path: str
-    benchmarks: list[str] = field(default_factory=list)
-    overrides: dict[str, Any] = field(default_factory=dict)
+    benchmarks: list[str]
+    model: str
+    run_name: str
+    api_base: str
+    bench_base_path: str
+    output_path: str
+    window_size: int
+    concurrency: int
+    interpolation: str
+    jpeg_quality: int
+    max_tokens: int
+    temperature: float
+    seed: int
+    negative_label: str
+    prompt_templates: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -90,9 +102,21 @@ def load_pipeline_config(yaml_path: str) -> PipelineConfig:
     )
 
     eval_cfg = EvalConfig(
-        eval_config_path=eval_raw.get("eval_config_path", ""),
         benchmarks=eval_raw.get("benchmarks", []),
-        overrides=eval_raw.get("overrides", {}),
+        model=eval_raw["model"],
+        run_name=eval_raw["run_name"],
+        api_base=eval_raw.get("api_base", "http://127.0.0.1:8000/v1"),
+        bench_base_path=eval_raw["bench_base_path"],
+        output_path=eval_raw["output_path"],
+        window_size=eval_raw.get("window_size", 15),
+        concurrency=eval_raw.get("concurrency", 10),
+        interpolation=eval_raw.get("interpolation", "forward"),
+        jpeg_quality=eval_raw.get("jpeg_quality", 95),
+        max_tokens=eval_raw.get("max_tokens", 15),
+        temperature=eval_raw.get("temperature", 0.0),
+        seed=eval_raw.get("seed", 0),
+        negative_label=eval_raw.get("negative_label", "normal"),
+        prompt_templates=eval_raw.get("prompt_templates", {}),
     )
 
     submit_cfg = SubmitConfig(

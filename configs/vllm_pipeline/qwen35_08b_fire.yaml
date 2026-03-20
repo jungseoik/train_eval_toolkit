@@ -35,7 +35,12 @@ docker:
 
 # ── 평가 설정 ──
 evaluate:
-  eval_config_path: "configs/vllm_eval/config.py"
+  model: "Qwen/Qwen3.5-0.8B"
+  run_name: "Qwen3_5-08B"
+  api_base: "http://127.0.0.1:8000/v1"
+  bench_base_path: "/mnt/PoC_benchmark/huggingface_benchmarks_dataset/Leaderboard_bench"
+  output_path: "/home/gpuadmin/Repo/seoik/train_eval_toolkit/results/vllm_eval"
+
   benchmarks:
     - "PIA_Fire"
     - "SamsungCNT_Fire"
@@ -43,12 +48,89 @@ evaluate:
     - "Hyundai_Fire"
     - "Coupang_Fire"
     - "Kumho_Fire"
-  overrides:
-    MODEL: "Qwen/Qwen3.5-0.8B"
-    RUN_NAME: "Qwen3_5-08B"
-    WINDOW_SIZE: 15
-    CONCURRENCY: 10
-    API_BASE: "http://127.0.0.1:8000/v1"
+
+  # 프레임 샘플링
+  window_size: 15
+  interpolation: "forward"
+
+  # 추론 파라미터
+  concurrency: 10
+  jpeg_quality: 95
+  max_tokens: 15
+  temperature: 0.0
+  seed: 0
+  negative_label: "normal"
+
+  # 카테고리별 프롬프트
+  prompt_templates:
+    falldown: |
+      Analyze this image carefully. Determine if a person has fallen down.
+
+      Important classification rules:
+
+      - The "falldown" category applies to any person who is lying down, regardless of:
+        - the surface (e.g., floor, mattress, bed)
+        - the posture (natural or unnatural)
+        - the cause (e.g., sleeping, collapsing, lying intentionally)
+      - This includes:
+        - A person lying flat on the ground or other surfaces
+        - A person collapsed or sprawled in any lying position
+      - The "normal" category applies only if the person is:
+        - sitting
+        - standing
+        - kneeling
+        - or otherwise upright (not lying down)
+
+      Answer in JSON format with BOTH of the following fields:
+      - "category": either "falldown" or "normal"
+      - "description": a brief reason why this classification was made (e.g., "person lying on a mattress", "person sitting on sofa")
+
+      Example:
+      {
+        "category": "falldown",
+        "description": "person lying on a mattress in natural posture"
+      }
+
+    fire: |
+      Analyze this image carefully. Only classify it as "fire" if there are ACTUAL FLAMES or ACTIVE FIRE visible in the image.
+
+      Important classification rules:
+
+      - The "fire" category applies ONLY to images with:
+       - visible flames or burning fire
+       - active combustion or blazing materials
+       - actual fire sources (e.g., campfire, house fire, candle flame, burning car, torch flame)
+      - This includes:
+       - Real flames from any source
+       - Active burning or combustion
+       - Visible fire with smoke and flames
+       - Burning vehicles or cars on fire
+       - Torches, flamethrowers, or similar devices with visible flames
+      - The "normal" category applies to:
+       - Fire-related objects WITHOUT actual flames (fire trucks, fire extinguishers, fire hydrants)
+       - Red colors, sunset glows, red lights, or the sun
+       - Fire emojis or cartoon representations of fire
+       - Text or words containing "fire" (signs, labels, written text)
+       - Any image without visible flames or active fire
+       - welding sparks, grinding sparks, cutting sparks, or metal sparks without visible flames
+       - glowing metal fragments, hot particles, or red/orange sparks from construction tools
+       - brief spark showers from machinery that do not show sustained flames or active burning
+
+      Answer in JSON format with BOTH of the following fields:
+      - "category": either "fire" or "normal"
+      - "description": a brief reason why this classification was made (e.g., "visible flames from campfire", "fire truck without flames")
+
+      Example:
+      {
+        "category": "fire",
+        "description": "visible flames from burning building"
+      }
+
+    smoke: "Is {category} visible in this image? Answer only with 0 (no) or 1 (yes)."
+    violence: "Is {category} visible in this image? Answer only with 0 (no) or 1 (yes)."
+    sittingdown: "Is {category} visible in this image? Answer only with 0 (no) or 1 (yes)."
+    smoking: "Is {category} visible in this image? Answer only with 0 (no) or 1 (yes)."
+    default: "Is {category} visible in this image? Answer only with 0 (no) or 1 (yes)."
 
 # ── 제출 설정 ──
 submit:
