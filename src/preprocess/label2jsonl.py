@@ -3,12 +3,11 @@ import yaml
 from pathlib import Path
 from tqdm import tqdm
 
-PROMPTS_DIR = Path(__file__).resolve().parents[2] / "configs" / "prompts"
-LABEL2JSONL_YAML = PROMPTS_DIR / "label2jsonl.yaml"
+LABEL2JSONL_YAML = Path(__file__).resolve().parents[2] / "configs" / "label_convert" / "prompts.yaml"
 
 
 def _load_prompts() -> dict:
-    """configs/prompts/label2jsonl.yaml에서 프롬프트를 로딩한다.
+    """configs/label_convert/prompts.yaml에서 프롬프트를 로딩한다.
 
     Returns:
         {(data_type, task_name): prompt_text, ...}
@@ -17,9 +16,9 @@ def _load_prompts() -> dict:
         data = yaml.safe_load(f)
 
     mapping = {}
-    for key, prompt_text in data.get("prompts", {}).items():
-        task_name, data_type = key.split("__")
-        mapping[(data_type, task_name)] = prompt_text
+    for task_name, types in data.get("prompts", {}).items():
+        for data_type, prompt_text in types.items():
+            mapping[(data_type, task_name)] = prompt_text
     return mapping
 
 
@@ -67,7 +66,7 @@ def create_final_dataset(root_dir: str, base_dir: str = "data/", mode: str = "tr
             available = [f"{tn} ({dt})" for (dt, tn) in prompt_mapping.keys()]
             print(f"오류: '{data_type}/{task_name}' 조합에 대한 프롬프트가 없습니다.")
             print(f"  사용 가능: {', '.join(available)}")
-            print(f"  configs/prompts/label2jsonl.yaml에 '{task_name}__{data_type}' 키를 추가하세요.")
+            print(f"  configs/label_convert/prompts.yaml에 '{task_name}' 블록을 추가하세요.")
             return [], skip_counts
 
     print(f"'{root_dir}' 디렉토리에서 JSON 파일 탐색을 시작합니다... (모드: {mode})")
