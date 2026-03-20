@@ -20,17 +20,18 @@ python main.py label2jsonl [옵션]
 |---|---|---|---|---|
 | `--input_dir` | `-i` | — | **필수** | JSON 라벨과 미디어 파일이 위치한 루트 디렉토리 |
 | `--output_file` | `-o` | — | **필수** | 결과를 저장할 JSONL 파일 경로 |
-| `--option` | `-opt` | `train` | 선택 | 변환 모드 (`train` / `test`) |
+| `--mode` | `-opt` | `train` | 선택 | 변환 모드 (`train` / `test`) |
 | `--data_type` | `-dt` | `video` | 선택 | 미디어 타입 (`video` / `image`) |
-| `--item_type` | `-ity` | `clip` | 선택 | JSONL `type` 필드값 (`clip` / `capture_frame`) |
-| `--item_task` | `-itk` | `caption` | 선택 | JSONL `task` 필드값 (`caption` 등) |
-| `--task_name` | `-tn` | `violence` | 선택 | 분류 작업명 — 프롬프트 자동 선택에 사용 (`violence` / `falldown`) |
+| `--item_type` | `-ity` | `clip` | 선택 | JSONL `type` 필드값 — 학습 프레임워크에서 데이터 유형 식별용 |
+| `--item_task` | `-itk` | `caption` | 선택 | JSONL `task` 필드값 — 학습 프레임워크에서 태스크 유형 식별용 |
+| `--task_name` | `-tn` | `violence` | 선택 | 분류 작업명 — 프롬프트 자동 선택에 사용 |
+| `--base-dir` | — | `data/` | 선택 | 미디어 상대 경로 계산 기준 디렉토리 |
 
 ---
 
 ## 옵션 상세 설명
 
-### `-opt` / `--option` — 변환 모드
+### `-opt` / `--mode` — 변환 모드
 
 | 값 | 동작 |
 |---|---|
@@ -52,12 +53,14 @@ python main.py label2jsonl [옵션]
 
 ### `-ity` / `--item_type` — 아이템 타입
 
-JSONL 각 항목의 `"type"` 필드에 들어가는 값입니다.
+JSONL 각 항목의 `"type"` 필드에 들어가는 값입니다. 학습 프레임워크에서 데이터 유형을 식별하는 키로 사용됩니다.
 
-| 값 | 의미 |
-|---|---|
-| `clip` | 짧은 영상 클립 단위 (비디오 라벨링 결과에 일반적으로 사용) |
-| `capture_frame` | 캡처된 이미지 프레임 단위 (이미지 데이터셋에 사용) |
+| 값 | 의미 | 권장 data_type |
+|---|---|---|
+| `clip` | 짧은 영상 클립 단위 | video |
+| `capture_frame` | 캡처된 이미지 프레임 단위 | image |
+
+자유 입력이 가능하므로, 새로운 데이터 유형에 맞게 지정할 수 있습니다.
 
 ---
 
@@ -65,14 +68,16 @@ JSONL 각 항목의 `"type"` 필드에 들어가는 값입니다.
 
 `train` 모드에서 `--data_type`과 함께 조합되어 **삽입할 human 프롬프트를 결정**합니다.
 
-| `--data_type` | `--task_name` | 적용 프롬프트 |
-|---|---|---|
-| `video` | `violence` | 비디오 폭력 행위 분류 프롬프트 |
-| `video` | `falldown` | 비디오 낙상 감지 프롬프트 |
-| `image` | `violence` | 이미지 폭력 행위 분류 프롬프트 |
-| `image` | `falldown` | 이미지 낙상 감지 프롬프트 |
+프롬프트는 `configs/prompts/label2jsonl.yaml`에서 관리됩니다.
 
-> 위 4가지 조합 외에는 해당 항목을 건너뜁니다. 새 작업을 추가하려면 `src/preprocess/label2jsonl.py`의 `PROMPT_MAPPING`에 추가하세요.
+| `--data_type` | `--task_name` | YAML 키 |
+|---|---|---|
+| `video` | `violence` | `violence__video` |
+| `video` | `falldown` | `falldown__video` |
+| `image` | `violence` | `violence__image` |
+| `image` | `falldown` | `falldown__image` |
+
+> **새 작업 추가**: `configs/prompts/label2jsonl.yaml`에 `{task_name}__{data_type}` 형식으로 프롬프트를 추가하면 코드 변경 없이 바로 사용할 수 있습니다.
 
 ---
 
@@ -116,7 +121,7 @@ JSONL 각 항목의 `"type"` 필드에 들어가는 값입니다.
 }
 ```
 
-> 미디어 파일 경로는 `data/` 기준 상대 경로로 저장됩니다.
+> 미디어 파일 경로는 `--base-dir` (기본 `data/`) 기준 상대 경로로 저장됩니다.
 
 ---
 
@@ -156,11 +161,7 @@ JSONL 각 항목의 `"type"` 필드에 들어가는 값입니다.
 python main.py label2jsonl \
   -i data/processed/gangnam/yeoksam2_v2/Train/video/violence \
   -o data/instruction/train/train_gangnam_yeoksam2_v2_video_violence.jsonl \
-  -dt video \
-  -opt train \
-  -ity clip \
-  -itk caption \
-  -tn violence
+  -dt video -opt train -ity clip -itk caption -tn violence
 ```
 
 ### 비디오 — 평가용 JSONL 생성 (falldown)
@@ -169,11 +170,7 @@ python main.py label2jsonl \
 python main.py label2jsonl \
   -i data/processed/gangnam/yeoksam2_v2/Test/video/falldown \
   -o data/instruction/evaluation/test_gangnam_yeoksam2_v2_video_falldown.jsonl \
-  -dt video \
-  -opt test \
-  -ity clip \
-  -itk caption \
-  -tn falldown
+  -dt video -opt test -ity clip -itk caption -tn falldown
 ```
 
 ### 이미지 — 학습용 JSONL 생성 (falldown)
@@ -182,11 +179,7 @@ python main.py label2jsonl \
 python main.py label2jsonl \
   -i data/processed/gangnam/yeoksam2_v2/Train/image/falldown \
   -o data/instruction/train/train_gangnam_yeoksam2_v2_image_falldown.jsonl \
-  -dt image \
-  -opt train \
-  -ity capture_frame \
-  -itk caption \
-  -tn falldown
+  -dt image -opt train -ity capture_frame -itk caption -tn falldown
 ```
 
 ### 이미지 — 평가용 JSONL 생성 (falldown)
@@ -195,11 +188,7 @@ python main.py label2jsonl \
 python main.py label2jsonl \
   -i data/processed/gangnam/yeoksam2_v2/Test/image/falldown \
   -o data/instruction/evaluation/test_gangnam_yeoksam2_v2_image_falldown.jsonl \
-  -dt image \
-  -opt test \
-  -ity capture_frame \
-  -itk caption \
-  -tn falldown
+  -dt image -opt test -ity capture_frame -itk caption -tn falldown
 ```
 
 ---
@@ -220,5 +209,6 @@ python main.py jsonl_inform_check \
 | 파일 | 역할 |
 |---|---|
 | `main.py` | CLI 서브커맨드 `label2jsonl` 등록 |
-| `src/preprocess/label2jsonl.py` | 핵심 변환 로직 및 프롬프트 정의 |
+| `src/preprocess/label2jsonl.py` | 핵심 변환 로직 |
+| `configs/prompts/label2jsonl.yaml` | 프롬프트 템플릿 정의 (task_name × data_type) |
 | `scripts/utils/label_to_jsonl.sh` | 프로젝트별 실제 사용 예시 모음 |
