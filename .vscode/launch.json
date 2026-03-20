@@ -14,46 +14,6 @@
             "cwd": "${workspaceFolder}",
             "justMyCode": false,
             "stopOnEntry": false
-        },
-        {
-            "name": "Evaluate Qualitative Video Violence",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/evaluation/evaluate_qualitative_video_violence.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}"
-            },
-            "args": [
-                "--checkpoint", "ckpts/InternVL3-2B_gangnam_rwf2000_gj_cctv_scvdALL_NOweapon_no_split",
-                "--input-root", "tmp/",
-                "--output-root", "tmp/tmp",
-                "--window-size", "12",
-                "--batch-size", "1",
-                "--multi-gpu"
-            ],
-            "justMyCode": false
-        },
-        {
-            "name": "falldown debug",
-            "type": "python",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/evaluation/evaluate_qualitative_video.py",
-            "console": "integratedTerminal",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}"
-            },
-            "args": [
-                "--checkpoint", "ckpts/InternVL3-2B_hyundai_5_20",
-                "--input-root", "/home/piawsa6000/nas192/Project/hyundai_backhwajum/01_16_ collection_data/video_preprocess/gen_ai/videos/falldown",
-                "--output-root", "/home/piawsa6000/nas192/Project/hyundai_backhwajum/general_video/seoik_vqa_result/tmp",
-                "--window-size", "15",
-                "--batch-size", "1",  // 디버깅 시에는 배치 사이즈를 줄이는 것이 좋습니다
-                // "--multi-gpu"      // ★중요★: 디버깅할 때는 멀티 GPU 옵션을 주석 처리하세요
-            ],
-            "justMyCode": false 
         }
-
     ]
 }
