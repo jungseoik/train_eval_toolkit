@@ -146,7 +146,7 @@ evaluate:
 submit:
   gradio_url: "http://172.168.47.39:7860/"
   model_name: "InternVL3-2B_hyundai_8_20"
-  task_name: "VLM"
+  task_name: "🌠 VLM 🖥️"
   datasets_used: "Finetuned"
   config_file: "config.json"
   results_base_dir: "results/lmdeploy_eval"
