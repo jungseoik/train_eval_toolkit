@@ -14,7 +14,6 @@ src/_autolabeling/
     └── translate_client.py - 번역 전용 Gemini 클라이언트
 
 configs/
-├── config_gemini.py    - Gemini 모델 설정 (model_name, project, location)
 └── prompts/            - 도메인별 프롬프트 YAML 파일
     ├── base.yaml       - basic, normal, vio, vio_timestamp
     ├── aihub_space.yaml
@@ -68,10 +67,20 @@ python main.py autolabel \
   -i data/processed/gangnam/yeoksam2_v2/Train/video/falldown \
   -opt gangnam -n 8 -m image
 
-# JSON description 번역 (영→한)
+# 모델 지정 (기본: gemini-3-pro-preview)
+python main.py autolabel \
+  -i data/processed/gangnam/gaepo1_v2/Train/video/violence/violence/clip \
+  -opt vio -n 16 -m video --model gemini-3-flash-preview
+
+# JSON description 번역 (영→한, 기본: gemini-2.0-flash)
 python main.py translate \
   -i data/processed/gangnam/gaepo1_v2/Train/video/violence/violence/clip \
   -n 16
+
+# 번역 모델 지정
+python main.py translate \
+  -i data/processed/gangnam/gaepo1_v2/Train/video/violence/violence/clip \
+  -n 16 --model gemini-3-flash-preview
 ```
 
 ## 지원 options 목록
@@ -92,6 +101,15 @@ python main.py translate \
 | gangnam          | video/image | 강남 특화                  |
 | hyundai_normal   | image       | 현대 에스컬레이터 정상     |
 | hyundai_falldown | image       | 현대 낙상 감지             |
+
+## 모델 설정
+
+CLI `--model` 옵션으로 Gemini 모델을 지정할 수 있습니다. 생략 시 기본값을 사용합니다.
+
+| 커맨드 | 기본 모델 | CLI 오버라이드 |
+|--------|-----------|----------------|
+| `autolabel` | `gemini-3-pro-preview` | `--model <모델명>` |
+| `translate` | `gemini-2.0-flash` | `--model <모델명>` |
 
 ## 동작 방식
 

@@ -7,9 +7,10 @@ from functools import partial
 from datetime import datetime
 
 from src._autolabeling.gemini.client import GeminiClient
-from configs.config_gemini import GEMINI_MODEL_CONFIG
 from src._autolabeling.prompt_loader import load_all_prompts
 from src.utils.json_parser import parse_json_from_response
+
+DEFAULT_MODEL = "gemini-3-pro-preview"
 
 # (options, mode) → prompt 딕셔너리 룩업 (YAML에서 로딩)
 _OPTION_PROMPT_MAP: dict[tuple[str, str], str] = load_all_prompts()
@@ -89,6 +90,7 @@ def autolabel_files_recursively(
     options: str = "basic",
     mode: str = "video",
     overwrite: bool = False,
+    model_name: Optional[str] = None,
 ) -> None:
     """지정된 폴더와 모든 하위 폴더를 순회하며 파일을 찾아 병렬로 오토라벨링합니다.
 
@@ -102,7 +104,9 @@ def autolabel_files_recursively(
         options: 라벨링 옵션 (예: "vio", "normal", "gangnam", ...).
         mode: 처리 대상 타입 ("video" 또는 "image").
         overwrite: True이면 기존 JSON 파일을 덮어씀.
+        model_name: Gemini 모델명 (None이면 DEFAULT_MODEL 사용).
     """
+    model_name = model_name or DEFAULT_MODEL
     if mode == "video":
         supported_extensions = (".mp4", ".avi", ".mov", ".mkv")
     else:
@@ -132,7 +136,7 @@ def autolabel_files_recursively(
     worker_func = partial(
         _label_single_file,
         prompt=prompt,
-        model_name=GEMINI_MODEL_CONFIG["model_name"],
+        model_name=model_name,
         media_type=mode,
         overwrite=overwrite,
     )

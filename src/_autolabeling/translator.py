@@ -2,12 +2,13 @@ import os
 import json
 from concurrent.futures import ProcessPoolExecutor
 from typing import Optional
+from functools import partial
 from datetime import datetime
 
-from src._autolabeling.gemini.translate_client import translate_english_to_korean
+from src._autolabeling.gemini.translate_client import translate_english_to_korean, DEFAULT_TRANSLATE_MODEL
 
 
-def _translate_and_update_single_json(json_path: str) -> Optional[str]:
+def _translate_and_update_single_json(json_path: str, model_name: str = DEFAULT_TRANSLATE_MODEL) -> Optional[str]:
     """단일 JSON 파일을 읽어 'description' 값을 번역하고 'description_kor'로 추가합니다."""
     print(f"Processing JSON: {json_path}...")
     try:
@@ -29,7 +30,7 @@ def _translate_and_update_single_json(json_path: str) -> Optional[str]:
             data["description_kor"] = ""
             return json_path
 
-        korean_description = translate_english_to_korean(english_description)
+        korean_description = translate_english_to_korean(english_description, model_name=model_name)
         data["description_kor"] = korean_description
 
         with open(json_path, "w", encoding="utf-8") as f:
@@ -50,6 +51,7 @@ def translate_descriptions_recursively(
     input_folder: str,
     failure_log_dir: str,
     num_workers: Optional[int] = None,
+    model_name: Optional[str] = None,
 ) -> None:
     """지정된 폴더와 모든 하위 폴더를 순회하며 JSON 파일을 찾아 병렬로 번역합니다.
 
@@ -60,7 +62,9 @@ def translate_descriptions_recursively(
         input_folder: 검색을 시작할 최상위 폴더 경로.
         failure_log_dir: 실패 로그 파일을 저장할 폴더 경로.
         num_workers: 사용할 CPU 코어 수 (None이면 기본값 사용).
+        model_name: Gemini 모델명 (None이면 DEFAULT_TRANSLATE_MODEL 사용).
     """
+    model_name = model_name or DEFAULT_TRANSLATE_MODEL
     json_files_to_process = []
     for root, _, files in os.walk(input_folder):
         for file in files:
@@ -74,9 +78,11 @@ def translate_descriptions_recursively(
     print(f"Found {len(json_files_to_process)} JSON files to process.")
     print(f"Using {num_workers if num_workers else 'default'} CPU cores for translation.")
 
+    worker_func = partial(_translate_and_update_single_json, model_name=model_name)
+
     failed_files = []
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
-        results = executor.map(_translate_and_update_single_json, json_files_to_process)
+        results = executor.map(worker_func, json_files_to_process)
         for json_path, result in zip(json_files_to_process, results):
             if result is None:
                 failed_files.append(json_path)

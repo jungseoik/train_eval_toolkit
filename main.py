@@ -71,6 +71,7 @@ def run_autolabel(args):
         num_workers=args.num_process,
         options=args.options,
         mode=args.mode,
+        model_name=args.model,
     )
     print("--- Autolabeling finished ---")
 
@@ -84,6 +85,7 @@ def run_translate(args):
         input_folder=args.input_dir,
         failure_log_dir=FAILURE_LOG_DIR,
         num_workers=args.num_process,
+        model_name=args.model,
     )
     print("--- Translation finished ---")
     
@@ -110,7 +112,9 @@ if __name__ == '__main__':
     parser_autolabel.add_argument('-n','--num_process', type=int, default=8, 
                                  required=False, help='Num processes')
     parser_autolabel.add_argument('-m','--mode', choices=['video', 'image'] , default='video',
-                                 required=False, help='Labeling mode type'),
+                                 required=False, help='Labeling mode type')
+    parser_autolabel.add_argument('--model', type=str, default=None,
+                                 help='Gemini 모델명 (기본: gemini-3-pro-preview)')
     parser_autolabel.set_defaults(func=run_autolabel)
 
     # --- 'translate' 서브 파서 ---
@@ -119,6 +123,8 @@ if __name__ == '__main__':
                                  help='Input directory containing JSON label files')
     parser_translate.add_argument('-n', '--num_process', type=int, default=8,
                                  required=False, help='Num processes')
+    parser_translate.add_argument('--model', type=str, default=None,
+                                 help='Gemini 모델명 (기본: gemini-2.0-flash)')
     parser_translate.set_defaults(func=run_translate)
 
     # --- 'jsonl_reindex_sorting' 서브 파서 ---

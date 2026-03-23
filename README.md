@@ -100,10 +100,13 @@ python main.py autolabel -i data/processed/gangnam/gaepo1_v2/Train/video/violenc
 
 # 이미지 라벨링
 python main.py autolabel -i data/processed/hyundai_backhwajum/abb_hyundai/train/falldown -opt hyundai_falldown -n 128 -m image
+
+# 모델 지정 (기본: gemini-3-pro-preview)
+python main.py autolabel -i data/processed/gangnam/gaepo1_v2/Train/video/violence/violence/clip -opt vio -n 16 -m video --model gemini-3-flash-preview
 ```
 
 - 지원 options 목록, 환경 설정, 번역 기능 등은 [autolabeling 문서](docs/labeling/autolabeling.md)를 참조하세요.
-- 실패 항목은 `assets/logs/failed_videos_*.txt`에 기록됩니다.
+- 실패 항목은 `assets/logs/failed_files_*.txt`에 기록됩니다.
 
 ### 2) 데이터클리닝(검수) + JSONL 생성
 
@@ -255,7 +258,7 @@ cp ckpts/InternVL3-2B/config.json ckpts/$MERGE_DIR/
 
 ```text
 .
-├── configs/                    # 오토라벨/전처리/학습 설정
+├── configs/                    # 프롬프트/전처리/학습 설정
 ├── scripts/
 │   ├── shell/internvl3.0/      # 학습 실행 스크립트
 │   ├── eval/                   # 평가 실행 스크립트
