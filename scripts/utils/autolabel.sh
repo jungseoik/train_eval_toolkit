@@ -1,3 +1,7 @@
+## 주의: -m 플래그 기본값은 "video"입니다.
+## 이미지 라벨링 시 반드시 -m image 를 명시하세요.
+## 누락하면 이미지 파일을 탐색하지 않아 "No files found" 가 발생합니다.
+
 ## example
 python main.py autolabel -i "data/raw/rwf2000/RWF-2000/train/NonFight" -opt "normal"
 python main.py autolabel -i "data/raw/rwf2000/RWF-2000/train/Fight" -opt "vio"

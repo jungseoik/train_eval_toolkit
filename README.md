@@ -279,7 +279,7 @@ cp ckpts/InternVL3-2B/config.json ckpts/$MERGE_DIR/
 - 학습/평가용 어노테이션: `data/instruction/train`, `data/instruction/evaluation`
 - 체크포인트: `ckpts/lora`, `ckpts/<MERGE_DIR>`
 - 평가 결과: `results/eval_result*`, `results/eval_quality*`
-- 오토라벨 실패 로그: `assets/logs/failed_videos_*.txt`
+- 오토라벨 실패 로그: `assets/logs/failed_files_*.txt`
 
 ## 운영/보안 주의사항
 
