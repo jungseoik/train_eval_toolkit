@@ -109,6 +109,7 @@ python main.py autolabel -i data/processed/gangnam/gaepo1_v2/Train/video/violenc
 ```
 
 - 지원 options 목록, 환경 설정, 번역 기능 등은 [autolabeling 문서](docs/labeling/autolabeling.md)를 참조하세요.
+- 에러 처리, 재시도, JSON 파싱 등 내부 동작 상세는 [autolabeling_internals 문서](docs/labeling/autolabeling_internals.md)를 참조하세요.
 - 실패 항목은 `assets/logs/failed_files_*.txt`에 기록됩니다.
 
 ### 2) 데이터클리닝(검수) + JSONL 생성

@@ -48,7 +48,7 @@ def _label_single_file(
 
         client = GeminiClient(model_name=model_name)
 
-        api_response_text = None
+        data = None
         for attempt in range(max_retries):
             try:
                 if media_type == "image":
@@ -56,20 +56,24 @@ def _label_single_file(
                 else:
                     api_response_text = client.analyze_video(video_path=file_path, custom_prompt=prompt)
 
-                if api_response_text:
-                    break
-                else:
+                if not api_response_text:
                     print(f"Attempt {attempt + 1}/{max_retries}: API returned empty response. Retrying...")
                     time.sleep(1)
+                    continue
+
+                parsed = parse_json_from_response(api_response_text)
+                if parsed and parsed.get("description"):
+                    data = parsed
+                    break
+
+                print(f"Attempt {attempt + 1}/{max_retries}: JSON 파싱 실패 또는 description 누락. Retrying...")
+                time.sleep(1)
             except Exception as e:
                 print(f"Attempt {attempt + 1}/{max_retries}: API call failed: {e}. Retrying...")
                 time.sleep(1)
-        else:
-            print(f"Error: All {max_retries} attempts failed for {file_path}. Skipping this file.")
-            return None
 
-        data = parse_json_from_response(api_response_text)
         if data is None:
+            print(f"Error: All {max_retries} attempts failed for {file_path}. Skipping this file.")
             return None
 
         with open(output_filepath, "w", encoding="utf-8") as f:
@@ -125,6 +129,16 @@ def autolabel_files_recursively(
 
     print(f"Found {len(files_to_process)} files to process.")
     print(f"Using {num_workers if num_workers else 'all available'} CPU cores.")
+
+    print("Validating API connection...")
+    try:
+        test_client = GeminiClient(model_name=model_name)
+        test_client.validate()
+        print("API connection validated successfully.")
+    except Exception as e:
+        print(f"\n❌ API 연결 검증 실패: {e}")
+        print("API 키, 모델명, 네트워크 상태를 확인하세요.")
+        return
 
     prompt = _OPTION_PROMPT_MAP.get((options, mode))
     if prompt is None:
