@@ -56,6 +56,7 @@ def run_autolabel(args):
         options=args.options,
         mode=args.mode,
         model_name=args.model,
+        overwrite=args.overwrite,
     )
     print("--- Autolabeling finished ---")
 
@@ -93,6 +94,8 @@ if __name__ == '__main__':
                                  required=False, help='Labeling mode type')
     parser_autolabel.add_argument('--model', type=str, default=None,
                                  help='Gemini 모델명 (기본: gemini-3-pro-preview)')
+    parser_autolabel.add_argument('--overwrite', action='store_true', default=False,
+                                 help='기존 JSON 라벨 파일이 있어도 덮어쓰기 (기본: False)')
     parser_autolabel.set_defaults(func=run_autolabel)
 
     # --- 'translate' 서브 파서 ---

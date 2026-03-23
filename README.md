@@ -103,6 +103,9 @@ python main.py autolabel -i data/processed/hyundai_backhwajum/abb_hyundai/train/
 
 # 모델 지정 (기본: gemini-3-pro-preview)
 python main.py autolabel -i data/processed/gangnam/gaepo1_v2/Train/video/violence/violence/clip -opt vio -n 16 -m video --model gemini-3-flash-preview
+
+# 기존 라벨 강제 덮어쓰기 (기본: 유효한 라벨이 있으면 스킵)
+python main.py autolabel -i data/processed/gangnam/gaepo1_v2/Train/video/violence/violence/clip -opt vio -n 16 -m video --overwrite
 ```
 
 - 지원 options 목록, 환경 설정, 번역 기능 등은 [autolabeling 문서](docs/labeling/autolabeling.md)를 참조하세요.
