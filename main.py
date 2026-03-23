@@ -105,7 +105,7 @@ if __name__ == '__main__':
     parser_translate.add_argument('-n', '--num_process', type=int, default=8,
                                  required=False, help='Num processes')
     parser_translate.add_argument('--model', type=str, default=None,
-                                 help='Gemini 모델명 (기본: gemini-2.0-flash)')
+                                 help='Gemini 모델명 (기본: gemini-2.5-flash)')
     parser_translate.set_defaults(func=run_translate)
 
     # --- 'jsonl_reindex_sorting' 서브 파서 ---

@@ -1,6 +1,6 @@
 from google import genai
 
-DEFAULT_TRANSLATE_MODEL = "gemini-2.0-flash"
+DEFAULT_TRANSLATE_MODEL = "gemini-2.5-flash"
 
 
 def translate_english_to_korean(english_sentence: str, model_name: str = DEFAULT_TRANSLATE_MODEL) -> str:
