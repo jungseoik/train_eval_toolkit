@@ -1,6 +1,4 @@
 import os
-from src.preprocess.video_splitter import preprocess_video_chunk_split_folder
-from configs.config_preprocess import INPUT_VIDEO_DIRECTORY, OUTPUT_CLIPS_DIRECTORY, CLIP_DURATION, NUM_CORES
 from src._autolabeling import autolabel_files_recursively, translate_descriptions_recursively
 import argparse
 
@@ -46,20 +44,6 @@ def run_label_to_jsonl(args):
          task_name=args.task_name,
      )
 
-def run_preprocess(args): # 이제 각 함수는 args를 받을 수 있습니다.
-    """전처리 프로세스를 실행합니다."""
-    print("--- Running video_splitter module ---")
-    # 향후 커맨드라인에서 값을 받고 싶다면 args.input_folder 처럼 사용 가능합니다.
-    os.makedirs(INPUT_VIDEO_DIRECTORY, exist_ok=True) 
-    preprocess_video_chunk_split_folder(
-        input_folder=INPUT_VIDEO_DIRECTORY,
-        output_folder=OUTPUT_CLIPS_DIRECTORY,
-        seconds_per_clip=CLIP_DURATION,
-        num_workers=NUM_CORES
-    )
-    print("--- Preprocessing finished ---")
-    
-
 def run_autolabel(args):
     """오토라벨 프로세스를 실행합니다."""
     FAILURE_LOG_DIR = "assets/logs"
@@ -94,12 +78,6 @@ if __name__ == '__main__':
     
     subparsers = parser.add_subparsers(dest='command' , required=True, help="Available commands")
     
-    # --- 'preprocess' 서브 파서 ---
-    parser_preprocess = subparsers.add_parser('preprocess', help='Run the video preprocessing process.')
-    # 나중에 preprocess에만 필요한 옵션이 생기면 여기에 추가합니다.
-    # 예: parser_preprocess.add_argument('--input', type=str, help='Input video directory')
-    parser_preprocess.set_defaults(func=run_preprocess) # 실행할 함수를 지정
-
     # --- 'autolabel' 서브 파서 ---
     parser_autolabel = subparsers.add_parser('autolabel', help='Run the autolabeling process.')
     parser_autolabel.add_argument('-i', '--input-dir', type=str, required=True,
