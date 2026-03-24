@@ -1,7 +1,8 @@
 """
-vLLM 파이프라인 설정 모듈.
+LMDeploy 파이프라인 설정 모듈.
 
 YAML 파일을 로드하여 타입 안전한 dataclass 객체로 변환.
+vllm_pipeline과 완전 독립 -- 추후 리팩토링 시 공통 부분 합침.
 """
 
 from __future__ import annotations
@@ -17,12 +18,13 @@ import yaml
 class DockerConfig:
     container_name: str
     image: str
-    model: str
+    model_path: str                                 # 로컬 모델 경로 (필수)
+    container_model_path: str = "/model"            # 컨테이너 내부 마운트 위치
     gpus: str = "all"
-    port: int = 8000
+    port: int = 23333                               # LMDeploy 기본 포트
     ipc: str = "host"
     volumes: list[str] = field(default_factory=list)
-    vllm_args: dict[str, Any] = field(default_factory=dict)
+    lmdeploy_args: dict[str, Any] = field(default_factory=dict)
     timeout_seconds: int = 300
     poll_interval_seconds: int = 5
     stream_logs: bool = True
@@ -90,12 +92,13 @@ def load_pipeline_config(yaml_path: str) -> PipelineConfig:
     docker_cfg = DockerConfig(
         container_name=docker_raw["container_name"],
         image=docker_raw["image"],
-        model=docker_raw["model"],
+        model_path=docker_raw["model_path"],
+        container_model_path=docker_raw.get("container_model_path", "/model"),
         gpus=docker_raw.get("gpus", "all"),
-        port=docker_raw.get("port", 8000),
+        port=docker_raw.get("port", 23333),
         ipc=docker_raw.get("ipc", "host"),
         volumes=docker_raw.get("volumes", []),
-        vllm_args=docker_raw.get("vllm_args", {}),
+        lmdeploy_args=docker_raw.get("lmdeploy_args", {}),
         timeout_seconds=startup.get("timeout_seconds", 300),
         poll_interval_seconds=startup.get("poll_interval_seconds", 5),
         stream_logs=startup.get("stream_logs", True),
@@ -105,7 +108,7 @@ def load_pipeline_config(yaml_path: str) -> PipelineConfig:
         benchmarks=eval_raw.get("benchmarks", []),
         model=eval_raw["model"],
         run_name=eval_raw["run_name"],
-        api_base=eval_raw.get("api_base", "http://127.0.0.1:8000/v1"),
+        api_base=eval_raw.get("api_base", "http://127.0.0.1:23333/v1"),
         bench_base_path=eval_raw["bench_base_path"],
         output_path=eval_raw["output_path"],
         window_size=eval_raw.get("window_size", 15),

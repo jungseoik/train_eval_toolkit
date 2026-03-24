@@ -1,9 +1,8 @@
 """
 평가 래퍼 모듈.
 
-기존 vllm_bench_eval.py의 evaluate_benchmark() 함수를 호출.
+lmdeploy_bench_eval.py의 evaluate_benchmark() 함수를 호출.
 YAML 설정에서 SimpleNamespace를 생성하여 config 모듈 대신 전달.
-기존 코드는 일체 수정하지 않음.
 """
 
 from __future__ import annotations
@@ -11,7 +10,7 @@ from __future__ import annotations
 import time
 from types import SimpleNamespace
 
-from src.evaluation.vllm_bench_eval import evaluate_benchmark
+from src.evaluation.lmdeploy_bench_eval import evaluate_benchmark
 
 from .config import EvalConfig
 
@@ -42,7 +41,7 @@ def run_evaluation(eval_cfg: EvalConfig, retry_max: int, retry_wait: int) -> dic
     벤치마크 목록을 순회하며 평가 실행.
 
     YAML에서 로드한 EvalConfig를 SimpleNamespace로 변환하여
-    evaluate_benchmark()에 전달. config.py 참조 없음.
+    evaluate_benchmark()에 전달.
 
     반환: {"success": [...], "failed": [...]}
     """

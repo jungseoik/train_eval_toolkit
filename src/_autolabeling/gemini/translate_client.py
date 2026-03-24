@@ -1,7 +1,9 @@
 from google import genai
 
+DEFAULT_TRANSLATE_MODEL = "gemini-2.5-flash"
 
-def translate_english_to_korean(english_sentence: str) -> str:
+
+def translate_english_to_korean(english_sentence: str, model_name: str = DEFAULT_TRANSLATE_MODEL) -> str:
     """영어 문장을 한국어로 번역한 결과만 반환합니다.
 
     환경변수 GEMINI_API_KEY가 설정되어 있어야 합니다.
@@ -13,7 +15,7 @@ def translate_english_to_korean(english_sentence: str) -> str:
         "한글 번역:"
     )
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model=model_name,
         contents=prompt,
     )
     result = response.text.strip()
@@ -21,7 +23,7 @@ def translate_english_to_korean(english_sentence: str) -> str:
     return result
 
 
-def translate_korean_to_english(korean_sentence: str) -> str:
+def translate_korean_to_english(korean_sentence: str, model_name: str = DEFAULT_TRANSLATE_MODEL) -> str:
     """한국어 문장을 영어로 번역한 결과만 반환합니다.
 
     환경변수 GEMINI_API_KEY가 설정되어 있어야 합니다.
@@ -33,7 +35,7 @@ def translate_korean_to_english(korean_sentence: str) -> str:
         "영어 번역:"
     )
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model=model_name,
         contents=prompt,
     )
     return response.text.strip()

@@ -4,33 +4,32 @@
 
 ```mermaid
 flowchart LR
-    A[데이터 수집] --> B[오토라벨링]
-    B --> C[데이터클리닝/검수]
+    B[오토라벨링] --> C[데이터클리닝/검수]
     C --> D[학습]
     D --> E[평가]
     E --> F[배포]
 
-    A -. 사용 도구 .-> A1[video split / folder split]
     B -. 사용 도구 .-> B1[main.py autolabel]
-    C -. 사용 도구 .-> C1[empty_json_checker / category stats / jsonl inform]
+    C -. 사용 도구 .-> C1[main.py data_check / jsonl_inform_check]
     D -. 사용 도구 .-> D1[internvl3.0 학습 스크립트]
     E -. 사용 도구 .-> E1[video/image evaluation 스크립트]
     F -. 사용 도구 .-> F1[merge_lora + 추론용 checkpoint]
 ```
 
-이 저장소는 `데이터 수집 -> 오토라벨링 -> 데이터클리닝(검수) -> 학습 -> 평가 -> 배포` 각 단계를 위한 도구 모음입니다.
+이 저장소는 `오토라벨링 -> 데이터클리닝(검수) -> 학습 -> 평가 -> 배포` 각 단계를 위한 도구 모음입니다. 데이터 수집은 별도로 진행합니다.
 
 ## 단계별 도구 매핑
 
 | 단계 | 핵심 작업 | 주요 도구/명령 | 근거 파일 |
 |---|---|---|---|
-| 데이터 수집 | 원본 데이터 정리/분할 | `main.py gj_split`, `main.py aihub_store_split`, `src/train_test_split_folder.py` | `main.py`, `src/preprocess/video_splitter.py`, `src/train_test_split_folder.py` |
 | 오토라벨링 | 영상/이미지 자동 라벨 생성 | `main.py autolabel` | [`docs/labeling/autolabeling.md`](docs/labeling/autolabeling.md) |
-| 데이터클리닝/검수 | 빈 라벨/분포/JSONL 품질 점검 | `empty_json_checker.py`, `json_category_stats.py`, `main.py jsonl_inform_check` | `src/data_checker/stats/empty_json_checker.py`, `src/stats/json_category_stats.py`, `src/utils/jsonl_inform_check.py` |
+| 데이터클리닝/검수 | 빈 라벨/분포/JSONL 품질 점검 | `main.py data_check`, `main.py jsonl_inform_check` | `src/data_checker/stats/json_checker.py`, `src/utils/jsonl_inform_check.py` |
 | 데이터클리닝/검수 | JSON 라벨 → 학습/평가용 JSONL 변환 | `main.py label2jsonl` | [`docs/cleaning/label_to_jsonl.md`](docs/cleaning/label_to_jsonl.md) |
 | 학습 | InternVL 파인튜닝 | `scripts/shell/internvl3.0/*.sh` | [`docs/train/training.md`](docs/train/training.md) |
 | 평가 | 비디오/이미지 정량 평가 | `evaluate_video_classfication_edit.py`, `evaluate_image_classfication.py` | [`docs/eval/eval_image_falldown.md`](docs/eval/eval_image_falldown.md) |
 | 평가 | 비디오 정성 평가 (threshold + 오버레이) | `evaluate_qualitative_video_threshold_image.py` | [`docs/eval/eval_quality.md`](docs/eval/eval_quality.md) |
+| 평가 | vLLM 자동화 파이프라인 (Docker→평가→제출) | `python -m src.vllm_pipeline.cli` | [`docs/eval/vllm_pipeline.md`](docs/eval/vllm_pipeline.md) |
+| 평가 | LMDeploy 벤치마크 파이프라인 (파인튜닝 모델) | `python -m src.lmdeploy_pipeline` | [`docs/eval/lmdeploy_pipeline.md`](docs/eval/lmdeploy_pipeline.md) |
 | 배포 | LoRA 병합 후 추론용 체크포인트 생성 | `merge_lora.py` | `src/training/tools/merge_lora.py`, `scripts/pipe_line/train_eval_save_hyundai_8_20.sh` |
 
 ## 빠른 시작
@@ -90,23 +89,7 @@ PYTHONPATH="$(pwd)" pytest tests/test_imports.py -v
 
 ## 단계별 실행 가이드
 
-### 1) 데이터 수집/정리(레거시)
-
-원본 폴더를 학습 가능한 구조로 분할/정리합니다.
-해당 단계는 현재는 무시합니다.
-
-```bash
-# Gangjin 포맷 비디오 분할
-python main.py gj_split -i data/raw/gj -o data/processed/gj -p 16
-
-# AIHub Store 포맷 비디오 분할
-python main.py aihub_store_split -i data/raw/aihub_store -o data/processed/aihub_store -p 16
-
-# media+json 쌍 기준 train/test 폴더 분리
-python src/train_test_split_folder.py -i data/processed/hyundai_backhwajum/hyundai_PoC_5camera_gen_ai -r 0.1
-```
-
-### 2) 오토라벨링
+### 1) 오토라벨링
 
 > 상세 내용: [docs/labeling/autolabeling.md](docs/labeling/autolabeling.md)
 
@@ -118,21 +101,26 @@ python main.py autolabel -i data/processed/gangnam/gaepo1_v2/Train/video/violenc
 
 # 이미지 라벨링
 python main.py autolabel -i data/processed/hyundai_backhwajum/abb_hyundai/train/falldown -opt hyundai_falldown -n 128 -m image
+
+# 모델 지정 (기본: gemini-3-pro-preview)
+python main.py autolabel -i data/processed/gangnam/gaepo1_v2/Train/video/violence/violence/clip -opt vio -n 16 -m video --model gemini-3-flash-preview
+
+# 기존 라벨 강제 덮어쓰기 (기본: 유효한 라벨이 있으면 스킵)
+python main.py autolabel -i data/processed/gangnam/gaepo1_v2/Train/video/violence/violence/clip -opt vio -n 16 -m video --overwrite
 ```
 
 - 지원 options 목록, 환경 설정, 번역 기능 등은 [autolabeling 문서](docs/labeling/autolabeling.md)를 참조하세요.
-- 실패 항목은 `assets/logs/failed_videos_*.txt`에 기록됩니다.
+- 에러 처리, 재시도, JSON 파싱 등 내부 동작 상세는 [autolabeling_internals 문서](docs/labeling/autolabeling_internals.md)를 참조하세요.
+- 실패 항목은 `assets/logs/failed_files_*.txt`에 기록됩니다.
 
-### 3) 데이터클리닝(검수) + JSONL 생성
+### 2) 데이터클리닝(검수) + JSONL 생성
 
 ```bash
-# 빈 JSON(clips) 점검
-python src/data_checker/stats/empty_json_checker.py --json_dir data/processed/gangnam
-
-# 카테고리 분포 점검
-python src/stats/json_category_stats.py data/processed/gangnam
+# JSON 라벨 카테고리 분포 점검 (하위 폴더 재귀 탐색)
+python main.py data_check -i data/processed/gangnam -t json
 ```
 
+> 출력 예시 및 옵션 상세: [docs/cleaning/data_check.md](docs/cleaning/data_check.md)
 > 라벨 → JSONL 변환 옵션 전체 설명: [docs/cleaning/label_to_jsonl.md](docs/cleaning/label_to_jsonl.md)
 
 Gangnam 데이터를 다운받아 압축 해제하면 `data/processed/gangnam/` 아래 `yeoksam2_v2/`, `gaepo1_v2/` 등의 구역 폴더가 생성됩니다. 각 구역 폴더 하위는 `Train/video/<category>/`, `Test/video/<category>/`, `Train/image/<category>/`, `Test/image/<category>/` 구조입니다.
@@ -171,7 +159,7 @@ python main.py train_test_split \
   -r 0.1 -o data/instruction
 ```
 
-### 4) 학습
+### 3) 학습
 
 > **학습 전 3단계 준비가 필요합니다.** 자세한 내용: [docs/train/pre_training_checklist.md](docs/train/pre_training_checklist.md)
 >
@@ -192,9 +180,9 @@ EPOCHS=20 GPUS=4 PER_DEVICE_BATCH_SIZE=2 bash scripts/pipe_line/train_eval_save_
 - 학습 전 체크리스트: [docs/train/pre_training_checklist.md](docs/train/pre_training_checklist.md)
 - 상세 파라미터 설명 및 GPU 메모리 절약 팁: [docs/train/training.md](docs/train/training.md)
 
-### 5) 평가
+### 4) 평가
 
-#### 5-1) 이미지 분류 정량 평가
+#### 4-1) 이미지 분류 정량 평가
 
 JSONL 어노테이션 기반으로 Precision / Recall / F1 을 산출합니다.
 
@@ -211,7 +199,7 @@ PYTHONPATH="$(pwd)" python src/evaluation/evaluate_image_classfication.py \
 > 참조 스크립트: `scripts/eval/eval_image_falldown/eval.sh`
 > 상세 가이드: [docs/eval/eval_image_falldown.md](docs/eval/eval_image_falldown.md)
 
-#### 5-2) 비디오 정성 평가 (Threshold + 이미지 오버레이)
+#### 4-2) 비디오 정성 평가 (Threshold + 이미지 오버레이)
 
 슬라이딩 윈도우로 비디오를 추론하고 판정 결과를 프레임에 오버레이한 영상을 저장합니다.
 
@@ -229,7 +217,7 @@ PYTHONPATH="$(pwd)" python src/evaluation/evaluate_qualitative_video_threshold_i
 > 참조 스크립트: `scripts/eval/eval_quality/eval.sh`
 > 상세 가이드: [docs/eval/eval_quality.md](docs/eval/eval_quality.md)
 
-#### 5-3) 비디오 정량 평가 (torchrun)
+#### 4-3) 비디오 정량 평가 (torchrun)
 
 ```bash
 PYTHONPATH="$(pwd)" torchrun --nproc_per_node=2 src/evaluation/evaluate_video_classfication_edit.py \
@@ -242,7 +230,35 @@ PYTHONPATH="$(pwd)" torchrun --nproc_per_node=2 src/evaluation/evaluate_video_cl
   --prompt-type violence
 ```
 
-### 6) 배포 (체크포인트 배포)
+#### 4-4) vLLM 자동화 파이프라인 (Docker → 평가 → 제출)
+
+YAML 설정 하나로 Docker 컨테이너 기동부터 벤치마크 평가, 결과 제출, 컨테이너 정리까지 자동 실행합니다.
+
+```bash
+conda activate llm
+python -m src.vllm_pipeline.cli -c configs/vllm_pipeline/qwen35_2b_fire.yaml
+
+# 특정 단계만 실행
+python -m src.vllm_pipeline.cli -c configs/vllm_pipeline/qwen35_2b_fire.yaml --steps evaluate submit
+```
+
+> 상세 가이드: [docs/eval/vllm_pipeline.md](docs/eval/vllm_pipeline.md)
+
+#### 4-5) LMDeploy 벤치마크 파이프라인 (파인튜닝 모델)
+
+파인튜닝 완료된 InternVL3 계열 로컬 모델의 **최종 벤치마크 평가** 전용 파이프라인입니다. 테스트셋 평가(Precision/Recall/F1)와는 별개로, PoC 리더보드 벤치마크 테스트에 사용합니다. YAML 설정 하나로 Docker 컨테이너(LMDeploy) 기동부터 벤치마크 평가, 결과 제출, 컨테이너 정리까지 자동 실행합니다.
+
+```bash
+conda activate llm
+python -m src.lmdeploy_pipeline -c configs/lmdeploy_pipeline/internvl3_2b_fire.yaml
+
+# 특정 단계만 실행
+python -m src.lmdeploy_pipeline -c configs/lmdeploy_pipeline/internvl3_2b_fire.yaml --steps evaluate submit
+```
+
+> 상세 가이드: [docs/eval/lmdeploy_pipeline.md](docs/eval/lmdeploy_pipeline.md)
+
+### 5) 배포 (체크포인트 배포)
 
 이 저장소에서 배포는 서버 서빙이 아니라, **LoRA 병합 후 추론 가능한 체크포인트를 생성해 배포 가능한 상태로 만드는 것**을 의미합니다.
 
@@ -261,7 +277,7 @@ cp ckpts/InternVL3-2B/config.json ckpts/$MERGE_DIR/
 
 ```text
 .
-├── configs/                    # 오토라벨/전처리/학습 설정
+├── configs/                    # 프롬프트/전처리/학습 설정
 ├── scripts/
 │   ├── shell/internvl3.0/      # 학습 실행 스크립트
 │   ├── eval/                   # 평가 실행 스크립트
@@ -272,6 +288,8 @@ cp ckpts/InternVL3-2B/config.json ckpts/$MERGE_DIR/
 │   ├── _autolabeling/          # Gemini 기반 오토라벨링 (docs/labeling/autolabeling.md)
 │   ├── data_checker/           # 데이터 점검
 │   ├── evaluation/             # 정량/정성 평가
+│   ├── vllm_pipeline/          # vLLM 자동화 파이프라인 (Docker→평가→제출)
+│   ├── lmdeploy_pipeline/      # LMDeploy 벤치마크 파이프라인 (파인튜닝 모델)
 │   └── training/               # InternVL 학습/모델/도구
 ├── main.py                     # 통합 CLI 엔트리포인트
 ├── requirements.txt
@@ -284,14 +302,14 @@ cp ckpts/InternVL3-2B/config.json ckpts/$MERGE_DIR/
 - 학습/평가용 어노테이션: `data/instruction/train`, `data/instruction/evaluation`
 - 체크포인트: `ckpts/lora`, `ckpts/<MERGE_DIR>`
 - 평가 결과: `results/eval_result*`, `results/eval_quality*`
-- 오토라벨 실패 로그: `assets/logs/failed_videos_*.txt`
+- 오토라벨 실패 로그: `assets/logs/failed_files_*.txt`
 
 ## 운영/보안 주의사항
 
 - 서비스 계정 키 경로, API 키, 내부 절대 경로를 저장소에 커밋하지 마세요.
 - `configs/config_gemini.py` 등 설정 파일은 환경별로 분리해 관리하세요.
 - 대용량 데이터/체크포인트는 Git 대신 별도 스토리지(예: NAS, 오브젝트 스토리지) 사용을 권장합니다.
-- 학습 전 `jsonl_inform_check`, `json_category_stats`로 데이터 품질을 먼저 확인하세요.
+- 학습 전 `main.py data_check`, `main.py jsonl_inform_check`로 데이터 품질을 먼저 확인하세요.
 
 ## 테스트
 

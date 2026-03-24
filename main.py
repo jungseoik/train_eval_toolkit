@@ -1,6 +1,4 @@
 import os
-from src.preprocess.video_splitter import preprocess_video_chunk_split_folder
-from configs.config_preprocess import INPUT_VIDEO_DIRECTORY, OUTPUT_CLIPS_DIRECTORY, CLIP_DURATION, NUM_CORES
 from src._autolabeling import autolabel_files_recursively, translate_descriptions_recursively
 import argparse
 
@@ -22,47 +20,29 @@ from src.utils.jsonl_inform_check import print_dataset_info
 def run_jsonl_inform_check(args):
     print_dataset_info(args.files)
 
-################################################################################################
-from src.preprocess.gj.gj_split import process_videos_clips
-def run_gj_video_split(args):
-    source_dir = args.input_dir
-    output_dir = args.output_dir
-    num_processes = args.num_processes
-    process_videos_clips(source_dir , output_dir, num_processes)
+from src.data_checker.stats.json_checker import check_json_directory
+def run_data_check(args):
+    """데이터 점검을 실행합니다. JSON 디렉토리 또는 JSONL 파일을 점검합니다."""
+    if args.type == "json":
+        check_json_directory(args.input, low_threshold=args.threshold)
+    elif args.type == "jsonl":
+        print_dataset_info(args.input if isinstance(args.input, list) else [args.input])
 
 from src.preprocess.train_test_split import split_dataset_final
 def run_split_train_test_dataset(args):
     split_dataset_final(args.input_file , args.ratio, args.output_dir)
-        
-from src.preprocess.aihub.store.aihub_store_split import process_videos_clips_aihub_store
-def run_aihub_store_video_split(args):
-    process_videos_clips_aihub_store(args.input_dir, args.output_dir, args.num_processes)
 from src.preprocess.label2jsonl import label_to_jsonl_result_save
 def run_label_to_jsonl(args):
      label_to_jsonl_result_save(
          input_dir=args.input_dir,
          output_file_path=args.output_file,
-         mode=args.option,
+         mode=args.mode,
          data_type=args.data_type,
-         base_dir="data/",
+         base_dir=args.base_dir,
          item_type=args.item_type,
          item_task=args.item_task,
          task_name=args.task_name,
      )
-
-def run_preprocess(args): # 이제 각 함수는 args를 받을 수 있습니다.
-    """전처리 프로세스를 실행합니다."""
-    print("--- Running video_splitter module ---")
-    # 향후 커맨드라인에서 값을 받고 싶다면 args.input_folder 처럼 사용 가능합니다.
-    os.makedirs(INPUT_VIDEO_DIRECTORY, exist_ok=True) 
-    preprocess_video_chunk_split_folder(
-        input_folder=INPUT_VIDEO_DIRECTORY,
-        output_folder=OUTPUT_CLIPS_DIRECTORY,
-        seconds_per_clip=CLIP_DURATION,
-        num_workers=NUM_CORES
-    )
-    print("--- Preprocessing finished ---")
-    
 
 def run_autolabel(args):
     """오토라벨 프로세스를 실행합니다."""
@@ -75,6 +55,8 @@ def run_autolabel(args):
         num_workers=args.num_process,
         options=args.options,
         mode=args.mode,
+        model_name=args.model,
+        overwrite=args.overwrite,
     )
     print("--- Autolabeling finished ---")
 
@@ -88,6 +70,7 @@ def run_translate(args):
         input_folder=args.input_dir,
         failure_log_dir=FAILURE_LOG_DIR,
         num_workers=args.num_process,
+        model_name=args.model,
     )
     print("--- Translation finished ---")
     
@@ -96,12 +79,6 @@ if __name__ == '__main__':
     
     subparsers = parser.add_subparsers(dest='command' , required=True, help="Available commands")
     
-    # --- 'preprocess' 서브 파서 ---
-    parser_preprocess = subparsers.add_parser('preprocess', help='Run the video preprocessing process.')
-    # 나중에 preprocess에만 필요한 옵션이 생기면 여기에 추가합니다.
-    # 예: parser_preprocess.add_argument('--input', type=str, help='Input video directory')
-    parser_preprocess.set_defaults(func=run_preprocess) # 실행할 함수를 지정
-
     # --- 'autolabel' 서브 파서 ---
     parser_autolabel = subparsers.add_parser('autolabel', help='Run the autolabeling process.')
     parser_autolabel.add_argument('-i', '--input-dir', type=str, required=True,
@@ -114,7 +91,11 @@ if __name__ == '__main__':
     parser_autolabel.add_argument('-n','--num_process', type=int, default=8, 
                                  required=False, help='Num processes')
     parser_autolabel.add_argument('-m','--mode', choices=['video', 'image'] , default='video',
-                                 required=False, help='Labeling mode type'),
+                                 required=False, help='Labeling mode type')
+    parser_autolabel.add_argument('--model', type=str, default=None,
+                                 help='Gemini 모델명 (기본: gemini-3-pro-preview)')
+    parser_autolabel.add_argument('--overwrite', action='store_true', default=False,
+                                 help='기존 JSON 라벨 파일이 있어도 덮어쓰기 (기본: False)')
     parser_autolabel.set_defaults(func=run_autolabel)
 
     # --- 'translate' 서브 파서 ---
@@ -123,6 +104,8 @@ if __name__ == '__main__':
                                  help='Input directory containing JSON label files')
     parser_translate.add_argument('-n', '--num_process', type=int, default=8,
                                  required=False, help='Num processes')
+    parser_translate.add_argument('--model', type=str, default=None,
+                                 help='Gemini 모델명 (기본: gemini-2.5-flash)')
     parser_translate.set_defaults(func=run_translate)
 
     # --- 'jsonl_reindex_sorting' 서브 파서 ---
@@ -148,38 +131,35 @@ if __name__ == '__main__':
                             help='A directory containing labels')
     parser_label_to_jsonl.add_argument('-o', '--output_file', type=str, required=True,
                             help='Location of jsonl file to save') 
-    parser_label_to_jsonl.add_argument('-opt', '--option', default="train", type=str, required=False,
-                            help='train or test extract mode select') 
-    parser_label_to_jsonl.add_argument('-dt', '--data_type', default="video", type=str, required=False,
-                            help='image or video type select') 
-    parser_label_to_jsonl.add_argument('-ity', '--item_type', default="clip", type=str, required=False,
-                            help='item type select , clip or capture_frame') 
-    parser_label_to_jsonl.add_argument('-itk', '--item_task', default="caption", type=str, required=False,
-                            help='item task select , caption or other')
-    parser_label_to_jsonl.add_argument('-tn', '--task_name', default="violence", type=str, required=False,      
-                                help='task name , violence , falldown , etc')
+    parser_label_to_jsonl.add_argument('-opt', '--mode', default="train", type=str,
+                            help='변환 모드 (train: 학습용, test: 평가용)')
+    parser_label_to_jsonl.add_argument('-dt', '--data_type', default="video", type=str,
+                            help='미디어 타입 (video / image)')
+    parser_label_to_jsonl.add_argument('-ity', '--item_type', default="clip", type=str,
+                            help='JSONL type 필드값 (예: clip, capture_frame)')
+    parser_label_to_jsonl.add_argument('-itk', '--item_task', default="caption", type=str,
+                            help='JSONL task 필드값 (예: caption)')
+    parser_label_to_jsonl.add_argument('-tn', '--task_name', default="violence", type=str,
+                            help='분류 작업명 — 프롬프트 선택 키 (예: violence, falldown)')
+    parser_label_to_jsonl.add_argument('--base-dir', default="data/", type=str,
+                            help='미디어 상대 경로 기준 디렉토리 (기본: data/)')
 
     parser_label_to_jsonl.set_defaults(func=run_label_to_jsonl)    
     
-    # --- 'jsonl_information_check' 서브 파서 ---
-    # remove_human_video_prompts("data/instruction/evaluation/test_rwf2000.jsonl")
+    # --- 'jsonl_information_check' 서브 파서 (하위 호환) ---
     parser_json_inform_check = subparsers.add_parser('jsonl_inform_check', help="jsonl information check")
     parser_json_inform_check.add_argument('-i', "--files",nargs='+', help='분석할 JSONL 파일 경로 (여러 개 가능)', required=True)
+    parser_json_inform_check.set_defaults(func=run_jsonl_inform_check)
 
-    parser_json_inform_check.set_defaults(func=run_jsonl_inform_check)    
-
-    ####################################################################################################################################
-
-
-    # --- 'gj_split_video' 서브 파서 ---
-    parser_gj_split = subparsers.add_parser('gj_split', help="split video ,Only gang-jin labeling format")
-    parser_gj_split.add_argument('-i', '--input_dir', type=str, required=True,
-                            help='Input directory containing video & label')
-    parser_gj_split.add_argument('-o', '--output_dir', type=str, required=True,
-                            help='Output save clip directory path')
-    parser_gj_split.add_argument('-p', '--num_processes', type=int, required=True,
-                            help='Number of processes to use for parallel processing')
-    parser_gj_split.set_defaults(func=run_gj_video_split)
+    # --- 'data_check' 서브 파서 (통합 데이터 점검) ---
+    parser_data_check = subparsers.add_parser('data_check', help="JSON 라벨/JSONL 데이터 통합 점검")
+    parser_data_check.add_argument('-i', '--input', type=str, required=True,
+                                   help='점검할 디렉토리(json) 또는 파일 경로(jsonl)')
+    parser_data_check.add_argument('-t', '--type', choices=['json', 'jsonl'], required=True,
+                                   help='점검 유형: json(라벨 디렉토리), jsonl(어노테이션 파일)')
+    parser_data_check.add_argument('--threshold', type=float, default=0.49,
+                                   help='낮은 비율 카테고리 기준값 (기본: 0.49)')
+    parser_data_check.set_defaults(func=run_data_check)
 
     # --- 'train_test_split' 서브 파서 ---
     parser_train_test_split = subparsers.add_parser('train_test_split', help="split video ,Only gang-jin labeling format")
@@ -190,18 +170,6 @@ if __name__ == '__main__':
     parser_train_test_split.add_argument('-o', '--output_dir', type=str, required=True,
                             help='train, test jsonl file save path ')
     parser_train_test_split.set_defaults(func=run_split_train_test_dataset)
-
-    # --- 'aihub_store_split_video' 서브 파서 ---
-    aihub_store_split_video = subparsers.add_parser('aihub_store_split', help="split video ,Only aihub-store labeling format")
-    aihub_store_split_video.add_argument('-i', '--input_dir', type=str, required=True,
-                            help='Input directory containing video & label')
-    aihub_store_split_video.add_argument('-o', '--output_dir', type=str, required=True,
-                            help='Output save clip directory path')
-    aihub_store_split_video.add_argument('-p', '--num_processes', type=int, required=True,
-                            help='Number of processes to use for parallel processing')
-    aihub_store_split_video.set_defaults(func=run_aihub_store_video_split)
-
-
 
     args = parser.parse_args()
     args.func(args)

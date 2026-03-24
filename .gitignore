@@ -235,4 +235,5 @@ results/*
 1.png
 test.mp4
 .claude
+.docs/
 pytest.ini

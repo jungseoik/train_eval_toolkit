@@ -1,8 +1,8 @@
 """
-Docker 컨테이너 관리 모듈.
+LMDeploy Docker 컨테이너 관리 모듈.
 
-vLLM Docker 컨테이너의 생명주기(시작, 상태 확인, 대기, 종료)를 관리.
-모델 로딩 중 실시간 로그 스트리밍과 치명적 에러 감지를 지원.
+LMDeploy Docker 컨테이너의 생명주기(시작, 상태 확인, 대기, 종료)를 관리.
+로컬 파인튜닝 모델 경로를 컨테이너에 마운트하여 LMDeploy API 서버를 기동.
 """
 
 from __future__ import annotations
@@ -54,27 +54,45 @@ def stop_container(name: str) -> None:
 
 
 def start_container(cfg: DockerConfig) -> str:
-    """docker run -d 명령을 조립하여 실행. container_id 반환."""
+    """
+    LMDeploy Docker 컨테이너를 시작.
+
+    docker run -d 명령을 조립하여 실행.
+    로컬 모델 경로를 컨테이너 내부에 마운트하고
+    lmdeploy serve api_server 명령으로 API 서버 기동.
+
+    반환: container_id
+    """
     cmd = [
         "docker", "run", "-d",
         "--name", cfg.container_name,
         "--gpus", cfg.gpus,
         "--ipc", cfg.ipc,
-        "-p", f"{cfg.port}:8000",
+        "-p", f"{cfg.port}:23333",
     ]
 
+    # 로컬 모델 경로 -> 컨테이너 마운트 (읽기 전용)
+    model_path = os.path.abspath(os.path.expanduser(cfg.model_path))
+    cmd.extend(["-v", f"{model_path}:{cfg.container_model_path}:ro"])
+
+    # 추가 볼륨 마운트
     for vol in cfg.volumes:
         cmd.extend(["-v", os.path.expanduser(vol)])
 
+    # Docker 이미지
     cmd.append(cfg.image)
 
-    cmd.extend(["--model", cfg.model])
+    # LMDeploy 서버 실행 명령
+    cmd.extend(["lmdeploy", "serve", "api_server", cfg.container_model_path])
+    cmd.extend(["--server-port", "23333"])
 
-    for key, value in cfg.vllm_args.items():
+    # LMDeploy 추가 인자 (--tp, --session-len, --backend 등)
+    for key, value in cfg.lmdeploy_args.items():
         cmd.append(f"--{key}")
         cmd.append(str(value))
 
     print(f"[DOCKER] Starting container: {cfg.container_name}")
+    print(f"[DOCKER] Model path: {model_path}")
     print(f"[DOCKER] Command: {' '.join(cmd)}")
 
     result = subprocess.run(cmd, capture_output=True, text=True)
@@ -88,7 +106,7 @@ def start_container(cfg: DockerConfig) -> str:
 
 def wait_for_ready(cfg: DockerConfig) -> bool:
     """
-    vLLM 서버가 요청을 받을 준비가 될 때까지 대기.
+    LMDeploy 서버가 요청을 받을 준비가 될 때까지 대기.
 
     1. 백그라운드 스레드에서 docker logs 실시간 스트리밍
     2. 메인 스레드에서 /v1/models HTTP 폴링
@@ -167,7 +185,7 @@ def _stream_docker_logs(
 
 
 def _check_health(port: int) -> bool:
-    """GET /v1/models → 200이면 True."""
+    """GET /v1/models -> 200이면 True."""
     try:
         resp = httpx.get(f"http://127.0.0.1:{port}/v1/models", timeout=5.0)
         return resp.status_code == 200
