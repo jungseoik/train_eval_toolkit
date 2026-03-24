@@ -50,6 +50,7 @@ evaluate:
   api_base: "http://127.0.0.1:23333/v1"
   bench_base_path: "/mnt/PoC_benchmark/huggingface_benchmarks_dataset/Leaderboard_bench"
   output_path: "results/lmdeploy_eval"
+  overwrite_results: true
 
   benchmarks:
     - "PIA_Fire"

@@ -64,6 +64,7 @@ python -m src.vllm_pipeline.cli -c configs/vllm_pipeline/qwen35_2b_fire.yaml --s
 | `evaluate.eval_config_path` | str | 필수 | 기존 config.py 경로 |
 | `evaluate.benchmarks` | list | config.py의 BENCHMARKS | 평가할 벤치마크 목록 |
 | `evaluate.overrides` | dict | {} | config.py 속성 런타임 덮어쓰기 |
+| `evaluate.overwrite_results` | bool | `true` | `true`: 항상 덮어쓰기, `false`: 기존 CSV 존재 + GT row 수 일치 시 스킵 |
 
 ### submit 섹션
 

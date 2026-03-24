@@ -117,6 +117,7 @@ python -m src.lmdeploy_pipeline -c configs/lmdeploy_pipeline/internvl3_2b_fire.y
 | `evaluate.seed` | int | `0` | 재현성을 위한 시드값 |
 | `evaluate.negative_label` | str | `"normal"` | 음성(Negative) 클래스 레이블 |
 | `evaluate.prompt_templates` | dict | `{}` | 카테고리별 프롬프트 |
+| `evaluate.overwrite_results` | bool | `true` | `true`: 항상 덮어쓰기, `false`: 기존 CSV 존재 + GT row 수 일치 시 스킵 |
 
 ### submit 섹션
 

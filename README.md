@@ -242,6 +242,13 @@ python -m src.vllm_pipeline.cli -c configs/vllm_pipeline/qwen35_2b_fire.yaml
 python -m src.vllm_pipeline.cli -c configs/vllm_pipeline/qwen35_2b_fire.yaml --steps evaluate submit
 ```
 
+YAML `evaluate.overwrite_results` 옵션으로 기존 결과 덮어쓰기/스킵 제어 가능:
+
+```yaml
+evaluate:
+  overwrite_results: true   # true(기본값)=항상 덮어쓰기, false=기존 CSV 존재+row수 일치 시 스킵
+```
+
 > 상세 가이드: [docs/eval/vllm_pipeline.md](docs/eval/vllm_pipeline.md)
 
 #### 4-5) LMDeploy 벤치마크 파이프라인 (파인튜닝 모델)
@@ -254,6 +261,13 @@ python -m src.lmdeploy_pipeline -c configs/lmdeploy_pipeline/internvl3_2b_fire.y
 
 # 특정 단계만 실행
 python -m src.lmdeploy_pipeline -c configs/lmdeploy_pipeline/internvl3_2b_fire.yaml --steps evaluate submit
+```
+
+YAML `evaluate.overwrite_results` 옵션으로 기존 결과 덮어쓰기/스킵 제어 가능:
+
+```yaml
+evaluate:
+  overwrite_results: true   # true(기본값)=항상 덮어쓰기, false=기존 CSV 존재+row수 일치 시 스킵
 ```
 
 > 상세 가이드: [docs/eval/lmdeploy_pipeline.md](docs/eval/lmdeploy_pipeline.md)
