@@ -47,6 +47,7 @@ class EvalConfig:
     seed: int
     negative_label: str
     prompt_templates: dict[str, str] = field(default_factory=dict)
+    overwrite_results: bool = True
 
 
 @dataclass
@@ -120,6 +121,7 @@ def load_pipeline_config(yaml_path: str) -> PipelineConfig:
         seed=eval_raw.get("seed", 0),
         negative_label=eval_raw.get("negative_label", "normal"),
         prompt_templates=eval_raw.get("prompt_templates", {}),
+        overwrite_results=eval_raw.get("overwrite_results", True),
     )
 
     submit_cfg = SubmitConfig(
