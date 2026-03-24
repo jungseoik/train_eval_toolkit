@@ -2,16 +2,67 @@
 파이프라인 오케스트레이터.
 
 Docker -> 평가 -> 제출 -> 정리 전체 파이프라인을 순차 실행.
+비정상 종료(예외, SIGTERM, SIGHUP 등) 시에도 Docker 컨테이너 cleanup을 보장.
 """
 
 from __future__ import annotations
 
+import atexit
+import signal
+import subprocess
+import sys
 import time
 
 from .config import PipelineConfig, load_pipeline_config
 from .docker_manager import check_existing_container, start_container, stop_container, wait_for_ready
 from .evaluator import run_evaluation
 from .submitter import submit_results
+
+# 프로세스 수준 cleanup 상태 (signal handler/atexit에서 참조)
+_cleanup_state: dict = {
+    "container_name": None,
+    "cleanup_enabled": False,
+    "cleaned": False,
+}
+
+
+def _emergency_cleanup() -> None:
+    """비정상 종료 시 컨테이너 정리. 멱등 — 여러 번 호출해도 안전."""
+    if _cleanup_state["cleaned"] or not _cleanup_state["cleanup_enabled"]:
+        return
+    container = _cleanup_state["container_name"]
+    if not container:
+        return
+    _cleanup_state["cleaned"] = True
+    try:
+        _dump_container_logs(container)
+        print(f"\n[EMERGENCY CLEANUP] Removing container: {container}")
+        subprocess.run(["docker", "rm", "-f", container], capture_output=True, text=True)
+    except Exception:
+        pass
+
+
+def _signal_handler(signum: int, _frame) -> None:
+    """SIGTERM/SIGHUP 수신 시 cleanup 후 종료."""
+    sig_name = signal.Signals(signum).name
+    print(f"\n[SIGNAL] {sig_name} received - cleaning up...")
+    _emergency_cleanup()
+    sys.exit(128 + signum)
+
+
+def _dump_container_logs(container_name: str) -> None:
+    """컨테이너 삭제 전 최근 로그를 콘솔에 출력 (사후 디버깅용)."""
+    try:
+        result = subprocess.run(
+            ["docker", "logs", "--tail", "50", container_name],
+            capture_output=True, text=True, timeout=10,
+        )
+        if result.stdout.strip():
+            print(f"\n[CLEANUP] Last 50 lines of container logs ({container_name}):")
+            for line in result.stdout.strip().splitlines():
+                print(f"  {line}")
+    except Exception:
+        pass
 
 
 def run_pipeline(yaml_path: str, override_steps: list[str] | None = None) -> None:
@@ -51,70 +102,80 @@ def run_pipeline(yaml_path: str, override_steps: list[str] | None = None) -> Non
     pipeline_start = time.time()
     docker_started = False
 
-    # -- DOCKER --
-    if steps.get("docker", False):
-        docker_started = True
-        docker_ok, docker_msg = _run_docker_step(cfg)
-        report["docker"] = docker_msg
-        if not docker_ok:
-            print(f"\n[PIPELINE] Docker failed - aborting pipeline")
-            _print_report(cfg.name, report, time.time() - pipeline_start)
-            return
-    else:
-        print("\n[PIPELINE] Docker step skipped")
+    # signal handler / atexit 등록
+    _cleanup_state["container_name"] = cfg.docker.container_name
+    _cleanup_state["cleanup_enabled"] = cfg.cleanup_docker
+    _cleanup_state["cleaned"] = False
+    signal.signal(signal.SIGTERM, _signal_handler)
+    signal.signal(signal.SIGHUP, _signal_handler)
+    atexit.register(_emergency_cleanup)
 
-    # -- EVALUATE --
-    eval_success_benchmarks = []
-    if steps.get("evaluate", False):
-        eval_result = run_evaluation(
-            cfg.evaluate, cfg.retry_max_attempts, cfg.retry_wait_seconds,
-        )
-        eval_success_benchmarks = eval_result["success"]
-        n_success = len(eval_result["success"])
-        n_failed = len(eval_result["failed"])
-        n_total = n_success + n_failed
-
-        if eval_result["failed"]:
-            failed_names = [f["benchmark"] for f in eval_result["failed"]]
-            report["eval"] = f"{n_success}/{n_total} benchmarks succeeded\n          X {', '.join(failed_names)}"
+    try:
+        # -- DOCKER --
+        if steps.get("docker", False):
+            docker_started = True
+            docker_ok, docker_msg = _run_docker_step(cfg)
+            report["docker"] = docker_msg
+            if not docker_ok:
+                print(f"\n[PIPELINE] Docker failed - aborting pipeline")
+                return
         else:
-            report["eval"] = f"{n_success}/{n_total} benchmarks succeeded"
-    else:
-        print("\n[PIPELINE] Evaluate step skipped")
+            print("\n[PIPELINE] Docker step skipped")
 
-    # -- SUBMIT --
-    if steps.get("submit", False):
-        submit_benchmarks = eval_success_benchmarks if eval_success_benchmarks else (
-            cfg.evaluate.benchmarks or []
-        )
-        if not submit_benchmarks:
-            print("\n[PIPELINE] No benchmarks to submit")
-            report["submit"] = "No benchmarks to submit"
-        else:
-            submit_result = submit_results(
-                cfg.submit, submit_benchmarks,
-                cfg.retry_max_attempts, cfg.retry_wait_seconds,
+        # -- EVALUATE --
+        eval_success_benchmarks = []
+        if steps.get("evaluate", False):
+            eval_result = run_evaluation(
+                cfg.evaluate, cfg.retry_max_attempts, cfg.retry_wait_seconds,
             )
-            n_success = len(submit_result["success"])
-            n_total = n_success + len(submit_result["failed"])
-            if submit_result["failed"]:
-                failed_names = [f["benchmark"] for f in submit_result["failed"]]
-                report["submit"] = f"{n_success}/{n_total} submitted\n          X {', '.join(failed_names)}"
+            eval_success_benchmarks = eval_result["success"]
+            n_success = len(eval_result["success"])
+            n_failed = len(eval_result["failed"])
+            n_total = n_success + n_failed
+
+            if eval_result["failed"]:
+                failed_names = [f["benchmark"] for f in eval_result["failed"]]
+                report["eval"] = f"{n_success}/{n_total} benchmarks succeeded\n          X {', '.join(failed_names)}"
             else:
-                report["submit"] = f"{n_success}/{n_total} submitted"
-    else:
-        print("\n[PIPELINE] Submit step skipped")
+                report["eval"] = f"{n_success}/{n_total} benchmarks succeeded"
+        else:
+            print("\n[PIPELINE] Evaluate step skipped")
 
-    # -- CLEANUP --
-    if docker_started and cfg.cleanup_docker:
-        print(f"\n[CLEANUP] Removing container: {cfg.docker.container_name}")
-        stop_container(cfg.docker.container_name)
-        report["cleanup"] = f"Container {cfg.docker.container_name} removed (GPU freed)"
-    elif docker_started:
-        report["cleanup"] = f"Container {cfg.docker.container_name} kept running"
+        # -- SUBMIT --
+        if steps.get("submit", False):
+            submit_benchmarks = eval_success_benchmarks if eval_success_benchmarks else (
+                cfg.evaluate.benchmarks or []
+            )
+            if not submit_benchmarks:
+                print("\n[PIPELINE] No benchmarks to submit")
+                report["submit"] = "No benchmarks to submit"
+            else:
+                submit_result = submit_results(
+                    cfg.submit, submit_benchmarks,
+                    cfg.retry_max_attempts, cfg.retry_wait_seconds,
+                )
+                n_success = len(submit_result["success"])
+                n_total = n_success + len(submit_result["failed"])
+                if submit_result["failed"]:
+                    failed_names = [f["benchmark"] for f in submit_result["failed"]]
+                    report["submit"] = f"{n_success}/{n_total} submitted\n          X {', '.join(failed_names)}"
+                else:
+                    report["submit"] = f"{n_success}/{n_total} submitted"
+        else:
+            print("\n[PIPELINE] Submit step skipped")
+    finally:
+        # -- CLEANUP (정상/비정상 모두 도달) --
+        if docker_started and cfg.cleanup_docker and not _cleanup_state["cleaned"]:
+            _dump_container_logs(cfg.docker.container_name)
+            print(f"\n[CLEANUP] Removing container: {cfg.docker.container_name}")
+            stop_container(cfg.docker.container_name)
+            _cleanup_state["cleaned"] = True
+            report["cleanup"] = f"Container {cfg.docker.container_name} removed (GPU freed)"
+        elif docker_started and not cfg.cleanup_docker:
+            report["cleanup"] = f"Container {cfg.docker.container_name} kept running"
 
-    total_elapsed = time.time() - pipeline_start
-    _print_report(cfg.name, report, total_elapsed)
+        total_elapsed = time.time() - pipeline_start
+        _print_report(cfg.name, report, total_elapsed)
 
 
 def _run_docker_step(cfg: PipelineConfig) -> tuple[bool, str]:
