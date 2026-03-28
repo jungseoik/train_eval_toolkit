@@ -8,7 +8,7 @@
 #   python -m src.lmdeploy_pipeline -c configs/lmdeploy_pipeline/internvl3_2b_fire.yaml
 #
 # 모델 교체 시 변경 필드:
-#   docker.model_path, evaluate.run_name, submit.model_name
+#   docker.model_path, docker.hf_repo_id, evaluate.run_name, submit.model_name
 # ============================================================
 
 pipeline:
