@@ -16,6 +16,7 @@ import time
 from .config import PipelineConfig, load_pipeline_config
 from .docker_manager import check_existing_container, start_container, stop_container, wait_for_ready
 from .evaluator import run_evaluation
+from .model_downloader import ensure_model
 from .submitter import submit_results
 
 # 프로세스 수준 cleanup 상태 (signal handler/atexit에서 참조)
@@ -70,11 +71,12 @@ def run_pipeline(yaml_path: str, override_steps: list[str] | None = None) -> Non
     전체 파이프라인 실행.
 
     1. PipelineConfig 로드
-    2. [DOCKER] 단계
-    3. [EVAL] 단계
-    4. [SUBMIT] 단계
-    5. [CLEANUP] Docker 컨테이너 정리
-    6. 최종 리포트
+    2. [MODEL] 모델 존재 확인 / HuggingFace 다운로드
+    3. [DOCKER] 단계
+    4. [EVAL] 단계
+    5. [SUBMIT] 단계
+    6. [CLEANUP] Docker 컨테이너 정리
+    7. 최종 리포트
     """
     cfg = load_pipeline_config(yaml_path)
 
@@ -93,6 +95,7 @@ def run_pipeline(yaml_path: str, override_steps: list[str] | None = None) -> Non
     print(f"Retry    : max={cfg.retry_max_attempts}, wait={cfg.retry_wait_seconds}s")
 
     report = {
+        "model": None,
         "docker": None,
         "eval": None,
         "submit": None,
@@ -101,6 +104,19 @@ def run_pipeline(yaml_path: str, override_steps: list[str] | None = None) -> Non
 
     pipeline_start = time.time()
     docker_started = False
+
+    # -- MODEL: 존재 확인 / HuggingFace 다운로드 --
+    try:
+        actual_model_path = ensure_model(cfg.docker)
+        if actual_model_path != cfg.docker.model_path:
+            cfg.docker.model_path = actual_model_path
+        report["model"] = f"Model ready: {cfg.docker.model_path}"
+    except (FileNotFoundError, RuntimeError) as e:
+        report["model"] = f"Model failed: {e}"
+        print(f"\n[PIPELINE] Model check failed - aborting pipeline")
+        total_elapsed = time.time() - pipeline_start
+        _print_report(cfg.name, report, total_elapsed)
+        return
 
     # signal handler / atexit 등록
     _cleanup_state["container_name"] = cfg.docker.container_name
@@ -208,6 +224,10 @@ def _print_report(name: str, report: dict, total_seconds: float) -> None:
     print(f"\n{'=' * 60}")
     print(f"Pipeline Complete: {name}")
     print(f"{'=' * 60}")
+
+    if report["model"]:
+        ok = "V" if "ready" in report["model"] else "X"
+        print(f"[MODEL]   {ok} {report['model']}")
 
     if report["docker"]:
         ok = "V" if "ready" in report["docker"] else "X"

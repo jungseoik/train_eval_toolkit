@@ -28,6 +28,7 @@ docker:
   container_name: "internvl3_2b_lmdeploy"
   image: "openmmlab/lmdeploy:latest-cu12"
   model_path: "ckpts/InternVL3-2B_hyundai_8_20"     # 로컬 파인튜닝 모델 경로
+  # hf_repo_id: "PIA-SPACE-LAB/PIA_AI2team_VQA_falldown"  # (선택) model_path에 모델이 없으면 HF에서 자동 다운로드
   container_model_path: "/model"
   gpus: "all"
   port: 23333

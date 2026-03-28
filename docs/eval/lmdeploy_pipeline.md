@@ -5,6 +5,7 @@
 
 ## 목차
 
+- [사전 준비](#사전-준비)
 - [동작 흐름](#동작-흐름)
 - [빠른 시작](#빠른-시작)
 - [단계별 실행](#단계별-실행)
@@ -16,9 +17,83 @@
 
 ---
 
+## 사전 준비
+
+파이프라인 실행 전 아래 항목을 확인하세요.
+
+### 1. 환경 설정
+
+```bash
+# llm conda 환경 활성화
+conda activate llm
+
+# huggingface_hub 설치 확인 (모델 자동 다운로드에 필요)
+pip show huggingface_hub
+```
+
+### 2. HuggingFace 로그인 (최초 1회)
+
+비공개 모델이나 gated 모델을 다운로드하려면 HuggingFace 인증이 필요합니다.
+
+```bash
+# HuggingFace CLI 설치 (없는 경우)
+curl -LsSf https://hf.co/cli/install.sh | bash
+
+# 로그인
+hf auth login
+```
+
+### 3. 모델 준비
+
+파이프라인은 실행 시 `docker.model_path` 경로에 모델이 있는지 자동으로 확인합니다.
+
+**Case 1: 모델이 이미 로컬에 있는 경우** -- 별도 작업 불필요
+
+```yaml
+docker:
+  model_path: "ckpts/InternVL3-2B"   # 이 경로에 config.json이 있으면 바로 실행
+```
+
+**Case 2: 모델이 없고, HuggingFace에서 자동 다운로드** -- `hf_repo_id` 설정
+
+```yaml
+docker:
+  model_path: "ckpts/PIA_AI2team_VQA_falldown"
+  hf_repo_id: "PIA-SPACE-LAB/PIA_AI2team_VQA_falldown"   # HF repo ID
+```
+
+- 파이프라인이 `model_path`에 유효한 모델(`config.json` 존재)이 없으면 `hf_repo_id`에서 자동 다운로드합니다
+- 다운로드 위치: `ckpts/{모델명}/` (cache 사용 안 함, 직접 저장)
+- 이미 다운로드된 경우 재다운로드하지 않음
+
+**Case 3: 모델이 없고, hf_repo_id도 미설정** -- 에러 발생 후 안내 메시지 출력
+
+**수동 다운로드 방법** (자동 다운로드 대신 직접 받는 경우):
+
+```bash
+mkdir -p ckpts/PIA_AI2team_VQA_falldown
+huggingface-cli download PIA-SPACE-LAB/PIA_AI2team_VQA_falldown \
+  --repo-type=model \
+  --local-dir ckpts/PIA_AI2team_VQA_falldown
+```
+
+### 4. Docker 환경
+
+- Docker가 설치되어 있어야 합니다
+- LMDeploy Docker 이미지: `openmmlab/lmdeploy:latest-cu12`
+- NVIDIA Container Toolkit이 설정되어 있어야 합니다 (`--gpus` 옵션 사용)
+
+### 5. 벤치마크 데이터셋
+
+`evaluate.bench_base_path`에 벤치마크 데이터셋이 존재해야 합니다.
+
+---
+
 ## 동작 흐름
 
 ```
+모델 존재 확인 (없으면 HuggingFace에서 다운로드)
+        ↓
 Docker 컨테이너 기동 (LMDeploy API 서버)
         ↓
 벤치마크 평가 (프레임 단위 추론)
@@ -88,6 +163,7 @@ python -m src.lmdeploy_pipeline -c configs/lmdeploy_pipeline/internvl3_2b_fire.y
 | `docker.container_name` | str | 필수 | Docker 컨테이너 이름 |
 | `docker.image` | str | 필수 | LMDeploy Docker 이미지 |
 | `docker.model_path` | str | 필수 | **로컬 파인튜닝 모델 경로** |
+| `docker.hf_repo_id` | str | `""` | HuggingFace 모델 repo ID (model_path에 모델 없을 시 자동 다운로드) |
 | `docker.container_model_path` | str | `"/model"` | 컨테이너 내부 마운트 위치 |
 | `docker.gpus` | str | `"all"` | GPU 할당 |
 | `docker.port` | int | `23333` | 호스트 포트 (LMDeploy 기본값) |
@@ -140,6 +216,7 @@ python -m src.lmdeploy_pipeline -c configs/lmdeploy_pipeline/internvl3_2b_fire.y
 | 필드 | 변경 내용 |
 |---|---|
 | `docker.model_path` | 파인튜닝 모델 로컬 경로 |
+| `docker.hf_repo_id` | (선택) HuggingFace repo ID -- model_path에 모델이 없을 때 자동 다운로드 |
 | `docker.container_name` | 고유한 컨테이너 이름 |
 | `evaluate.run_name` | 결과 디렉토리명 |
 | `evaluate.model` | 컨테이너 내부 모델 경로 (보통 `/model` 고정) |
@@ -184,6 +261,7 @@ src/lmdeploy_pipeline/
     __main__.py          # python -m src.lmdeploy_pipeline 진입점
     cli.py               # CLI 진입점
     config.py            # YAML 파싱 및 dataclass 정의
+    model_downloader.py  # 모델 존재 확인 및 HuggingFace 다운로드
     docker_manager.py    # LMDeploy Docker 생명주기 관리
     evaluator.py         # 평가 래퍼
     submitter.py         # Gradio 제출

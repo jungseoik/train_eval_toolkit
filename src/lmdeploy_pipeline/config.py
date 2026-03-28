@@ -19,6 +19,7 @@ class DockerConfig:
     container_name: str
     image: str
     model_path: str                                 # 로컬 모델 경로 (필수)
+    hf_repo_id: str = ""                            # HuggingFace 모델 레포 ID (예: PIA-SPACE-LAB/PIA_AI2team_VQA_falldown)
     container_model_path: str = "/model"            # 컨테이너 내부 마운트 위치
     gpus: str = "all"
     port: int = 23333                               # LMDeploy 기본 포트
@@ -94,6 +95,7 @@ def load_pipeline_config(yaml_path: str) -> PipelineConfig:
         container_name=docker_raw["container_name"],
         image=docker_raw["image"],
         model_path=docker_raw["model_path"],
+        hf_repo_id=docker_raw.get("hf_repo_id", ""),
         container_model_path=docker_raw.get("container_model_path", "/model"),
         gpus=docker_raw.get("gpus", "all"),
         port=docker_raw.get("port", 23333),

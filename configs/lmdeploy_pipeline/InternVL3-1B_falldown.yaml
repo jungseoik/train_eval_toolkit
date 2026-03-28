@@ -28,6 +28,7 @@ docker:
   container_name: "internvl3_1b_lmdeploy"
   image: "openmmlab/lmdeploy:latest-cu12"
   model_path: "ckpts/InternVL3-1B"     # 베이스 모델 경로
+  # hf_repo_id: "OpenGVLab/InternVL3-1B"  # (선택) model_path에 모델이 없으면 HF에서 자동 다운로드
   container_model_path: "/model"
   gpus: "all"
   port: 23333

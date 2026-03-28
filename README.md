@@ -253,7 +253,7 @@ evaluate:
 
 #### 4-5) LMDeploy 벤치마크 파이프라인 (파인튜닝 모델)
 
-파인튜닝 완료된 InternVL3 계열 로컬 모델의 **최종 벤치마크 평가** 전용 파이프라인입니다. 테스트셋 평가(Precision/Recall/F1)와는 별개로, PoC 리더보드 벤치마크 테스트에 사용합니다. YAML 설정 하나로 Docker 컨테이너(LMDeploy) 기동부터 벤치마크 평가, 결과 제출, 컨테이너 정리까지 자동 실행합니다.
+파인튜닝 완료된 InternVL3 계열 로컬 모델의 **최종 벤치마크 평가** 전용 파이프라인입니다. 테스트셋 평가(Precision/Recall/F1)와는 별개로, PoC 리더보드 벤치마크 테스트에 사용합니다. YAML 설정 하나로 모델 존재 확인(없으면 HuggingFace 자동 다운로드), Docker 컨테이너(LMDeploy) 기동, 벤치마크 평가, 결과 제출, 컨테이너 정리까지 자동 실행합니다.
 
 ```bash
 conda activate llm
@@ -263,14 +263,15 @@ python -m src.lmdeploy_pipeline -c configs/lmdeploy_pipeline/internvl3_2b_fire.y
 python -m src.lmdeploy_pipeline -c configs/lmdeploy_pipeline/internvl3_2b_fire.yaml --steps evaluate submit
 ```
 
-YAML `evaluate.overwrite_results` 옵션으로 기존 결과 덮어쓰기/스킵 제어 가능:
+YAML에서 `docker.hf_repo_id`를 설정하면 `model_path`에 모델이 없을 때 HuggingFace에서 자동 다운로드합니다:
 
 ```yaml
-evaluate:
-  overwrite_results: true   # true(기본값)=항상 덮어쓰기, false=기존 CSV 존재+row수 일치 시 스킵
+docker:
+  model_path: "ckpts/PIA_AI2team_VQA_falldown"
+  hf_repo_id: "PIA-SPACE-LAB/PIA_AI2team_VQA_falldown"  # 모델 없으면 자동 다운로드
 ```
 
-> 상세 가이드: [docs/eval/lmdeploy_pipeline.md](docs/eval/lmdeploy_pipeline.md)
+> 사전 준비 및 상세 가이드: [docs/eval/lmdeploy_pipeline.md](docs/eval/lmdeploy_pipeline.md)
 
 ### 5) 배포 (체크포인트 배포)
 
