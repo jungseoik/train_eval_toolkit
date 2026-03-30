@@ -139,6 +139,8 @@ python -m src.lmdeploy_pipeline -c configs/lmdeploy_pipeline/internvl3_2b_fire.y
 
 ## YAML 설정 레퍼런스
 
+> YAML 설정 파일을 처음 작성하는 경우 [YAML 설정 작성 가이드](lmdeploy_yaml_guide.md)를 참조하세요. 전체 템플릿, 벤치마크 목록, 프롬프트 작성법이 포함되어 있습니다.
+
 ### pipeline 섹션
 
 | 키 | 타입 | 기본값 | 설명 |

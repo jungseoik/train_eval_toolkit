@@ -272,6 +272,7 @@ docker:
 ```
 
 > 사전 준비 및 상세 가이드: [docs/eval/lmdeploy_pipeline.md](docs/eval/lmdeploy_pipeline.md)
+> YAML 설정 작성법: [docs/eval/lmdeploy_yaml_guide.md](docs/eval/lmdeploy_yaml_guide.md)
 
 ### 5) 배포 (체크포인트 배포)
 
