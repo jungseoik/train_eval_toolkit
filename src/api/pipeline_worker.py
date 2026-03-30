@@ -148,9 +148,13 @@ async def run_pipeline_sse(
 
     Docker 준비 → 벤치마크 시작 확인까지 SSE 스트리밍.
     이후 평가/제출/cleanup은 백그라운드 스레드에서 진행.
+
+    클라이언트 연결 끊김(GeneratorExit) 등 어떤 상황에서도
+    lock 해제를 보장하기 위해 background_started 플래그를 사용한다.
     """
     loop = asyncio.get_event_loop()
     yaml_path = None
+    background_started = False  # 백그라운드 스레드가 lock 책임을 인계받았는지
 
     try:
         # 1. YAML 검증
@@ -158,7 +162,6 @@ async def run_pipeline_sse(
         valid, result = validate_yaml(yaml_content)
         if not valid:
             yield sse_event("error", result, hint="YAML 형식을 확인해주세요. 작성 가이드: docs/eval/lmdeploy_yaml_guide.md")
-            lock.release()
             return
 
         yield sse_event("yaml_validated", "YAML 검증 완료")
@@ -169,8 +172,6 @@ async def run_pipeline_sse(
             cfg = await loop.run_in_executor(None, load_pipeline_config, yaml_path)
         except Exception as e:
             yield sse_event("error", f"설정 로드 실패: {e}", hint="YAML 필드를 확인해주세요.")
-            lock.release()
-            _safe_remove(yaml_path)
             return
 
         pipeline_name = cfg.name
@@ -187,8 +188,6 @@ async def run_pipeline_sse(
             yield sse_event("model_ready", f"모델 준비 완료: {cfg.docker.model_path}")
         except (FileNotFoundError, RuntimeError) as e:
             yield sse_event("error", f"모델 에러: {e}", hint=_get_error_hint(e))
-            lock.release()
-            _safe_remove(yaml_path)
             return
 
         # 4. Docker 기동
@@ -203,8 +202,6 @@ async def run_pipeline_sse(
             await loop.run_in_executor(None, start_container, cfg.docker)
         except RuntimeError as e:
             yield sse_event("error", f"Docker 기동 실패: {e}", hint=_get_error_hint(e))
-            lock.release()
-            _safe_remove(yaml_path)
             return
 
         # 5. 서버 준비 대기
@@ -214,13 +211,10 @@ async def run_pipeline_sse(
             ready = await loop.run_in_executor(None, wait_for_ready, cfg.docker)
         except Exception as e:
             yield sse_event("error", f"서버 준비 실패: {e}", hint=_get_error_hint(e))
-            # cleanup container
             try:
                 await loop.run_in_executor(None, stop_container, cfg.docker.container_name)
             except Exception:
                 pass
-            lock.release()
-            _safe_remove(yaml_path)
             return
 
         if not ready:
@@ -229,8 +223,6 @@ async def run_pipeline_sse(
                 await loop.run_in_executor(None, stop_container, cfg.docker.container_name)
             except Exception:
                 pass
-            lock.release()
-            _safe_remove(yaml_path)
             return
 
         docker_elapsed = time.time() - docker_start
@@ -242,21 +234,30 @@ async def run_pipeline_sse(
         yield sse_event("done", "평가가 시작되었습니다. 추후 벤치마크 결과를 리더보드에서 확인해보세요.")
 
         # 7. 백그라운드 스레드에서 평가 + 제출 + cleanup
+        #    이 시점부터 lock 해제 책임은 백그라운드 스레드로 이관
         state["status"] = "evaluating"
+        background_started = True
         thread = threading.Thread(
             target=_background_eval_submit_cleanup,
             args=(cfg, state, lock, yaml_path),
-            daemon=True,
+            daemon=False,
         )
         thread.start()
-        # yaml_path는 백그라운드에서 삭제하므로 여기서는 건드리지 않음
 
+    except GeneratorExit:
+        # 클라이언트가 SSE 연결을 끊은 경우 (curl Ctrl+C 등)
+        pass
     except Exception as e:
         yield sse_event("error", f"예기치 않은 에러: {e}", hint=_get_error_hint(e))
-        if lock.locked():
-            lock.release()
-        if yaml_path:
-            _safe_remove(yaml_path)
+    finally:
+        # 백그라운드 스레드가 시작되지 않았으면 여기서 정리
+        if not background_started:
+            if yaml_path:
+                _safe_remove(yaml_path)
+            state["status"] = "idle"
+            state["finished_at"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+            if lock.locked():
+                lock.release()
 
 
 def _safe_remove(path: str) -> None:
