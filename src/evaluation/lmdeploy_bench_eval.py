@@ -363,9 +363,27 @@ def evaluate_benchmark(bench_name: str, cfg: ModuleType) -> None:
     output_dir = Path(cfg.OUTPUT_PATH) / cfg.RUN_NAME / bench_name
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    overwrite = getattr(cfg, "OVERWRITE_RESULTS", True)
+    skipped = 0
+
     for i, (video_path, gt_csv_path) in enumerate(pairs):
         label = f"[{i+1}/{len(pairs)}] {video_path.name[:50]:<50}"
-        print(f"\n  {label}")
+
+        if not overwrite:
+            output_csv = output_dir / f"{video_path.stem}.csv"
+            if output_csv.exists():
+                expected_rows = sum(1 for _ in open(gt_csv_path, encoding="utf-8"))
+                actual_rows = sum(1 for _ in open(output_csv, encoding="utf-8"))
+                if actual_rows == expected_rows:
+                    skipped += 1
+                    continue
+                print(f"\n  {label}")
+                print(f"  [MISMATCH] expected={expected_rows} actual={actual_rows} -> re-evaluate")
+            else:
+                print(f"\n  {label}")
+        else:
+            print(f"\n  {label}")
+
         t_start = time.perf_counter()
 
         try:
@@ -390,6 +408,8 @@ def evaluate_benchmark(bench_name: str, cfg: ModuleType) -> None:
 
         print(f"  Saved -> {output_csv}")
 
+    if skipped:
+        print(f"\n  Skipped {skipped}/{len(pairs)} (existing results with matching rows)")
     print(f"\n  Output dir -> {output_dir}")
 
 

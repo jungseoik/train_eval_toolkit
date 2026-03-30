@@ -34,6 +34,9 @@ class TestImports:
     def test_import_evaluator(self):
         from src.lmdeploy_pipeline.evaluator import run_evaluation
 
+    def test_import_model_downloader(self):
+        from src.lmdeploy_pipeline.model_downloader import ensure_model
+
     def test_import_runner(self):
         from src.lmdeploy_pipeline.runner import run_pipeline
 
@@ -320,3 +323,146 @@ class TestUtils:
         assert get_category_from_bench("KhonKaen_Smoke") == "smoke"
         assert get_category_from_bench("GangNam_Violence") == "violence"
         assert get_category_from_bench("ABB_Sittingdown") == "sittingdown"
+
+
+# ============================================================
+# 모델 다운로더 테스트
+# ============================================================
+
+class TestModelDownloader:
+    """ensure_model() 로직 검증 (실제 다운로드 없이)."""
+
+    def test_model_exists(self, tmp_path):
+        """모델이 이미 존재하면 그대로 경로 반환."""
+        from src.lmdeploy_pipeline.config import DockerConfig
+        from src.lmdeploy_pipeline.model_downloader import ensure_model
+
+        model_dir = tmp_path / "test_model"
+        model_dir.mkdir()
+        (model_dir / "config.json").write_text("{}")
+
+        cfg = DockerConfig(
+            container_name="test",
+            image="test:latest",
+            model_path=str(model_dir),
+        )
+
+        result = ensure_model(cfg)
+        assert result == str(model_dir)
+
+    def test_model_missing_no_hf_repo_id(self, tmp_path):
+        """모델이 없고 hf_repo_id도 없으면 FileNotFoundError."""
+        from src.lmdeploy_pipeline.config import DockerConfig
+        from src.lmdeploy_pipeline.model_downloader import ensure_model
+
+        cfg = DockerConfig(
+            container_name="test",
+            image="test:latest",
+            model_path=str(tmp_path / "nonexistent"),
+        )
+
+        with pytest.raises(FileNotFoundError, match="hf_repo_id"):
+            ensure_model(cfg)
+
+    def test_model_missing_with_hf_repo_id(self, tmp_path, monkeypatch):
+        """모델이 없고 hf_repo_id가 있으면 snapshot_download 호출."""
+        from src.lmdeploy_pipeline.config import DockerConfig
+        from src.lmdeploy_pipeline.model_downloader import ensure_model
+
+        model_dir = tmp_path / "downloaded_model"
+        download_calls = []
+
+        def mock_snapshot_download(repo_id, repo_type, local_dir):
+            download_calls.append({"repo_id": repo_id, "local_dir": local_dir})
+            Path(local_dir).mkdir(parents=True, exist_ok=True)
+            (Path(local_dir) / "config.json").write_text("{}")
+
+        monkeypatch.setattr(
+            "src.lmdeploy_pipeline.model_downloader.snapshot_download",
+            mock_snapshot_download,
+            raising=False,
+        )
+        # snapshot_download가 이미 import 되어있을 수 있으므로 모듈 레벨에서도 패치
+        import src.lmdeploy_pipeline.model_downloader as mdl
+        monkeypatch.setattr(mdl, "_download_from_hf", lambda repo_id, target_path: (
+            mock_snapshot_download(repo_id, "model", str(target_path)) or str(target_path)
+        ))
+
+        cfg = DockerConfig(
+            container_name="test",
+            image="test:latest",
+            model_path=str(model_dir),
+            hf_repo_id="PIA-SPACE-LAB/PIA_AI2team_VQA_falldown",
+        )
+
+        result = ensure_model(cfg)
+        assert result == str(model_dir)
+        assert len(download_calls) == 1
+        assert download_calls[0]["repo_id"] == "PIA-SPACE-LAB/PIA_AI2team_VQA_falldown"
+
+    def test_is_valid_model_dir(self, tmp_path):
+        """config.json이 있어야 유효한 모델 디렉토리."""
+        from src.lmdeploy_pipeline.model_downloader import _is_valid_model_dir
+
+        # 빈 디렉토리
+        empty_dir = tmp_path / "empty"
+        empty_dir.mkdir()
+        assert _is_valid_model_dir(empty_dir) is False
+
+        # config.json이 있는 디렉토리
+        valid_dir = tmp_path / "valid"
+        valid_dir.mkdir()
+        (valid_dir / "config.json").write_text("{}")
+        assert _is_valid_model_dir(valid_dir) is True
+
+        # 존재하지 않는 디렉토리
+        assert _is_valid_model_dir(tmp_path / "nonexistent") is False
+
+    def test_config_hf_repo_id_default(self, tmp_path):
+        """hf_repo_id 미지정 시 빈 문자열."""
+        config = {
+            "pipeline": {"name": "Test", "steps": {"docker": True, "evaluate": True, "submit": False}, "cleanup_docker": True},
+            "retry": {"max_attempts": 1, "wait_seconds": 5},
+            "docker": {
+                "container_name": "test",
+                "image": "test:latest",
+                "model_path": "/tmp/model",
+                "startup": {},
+            },
+            "evaluate": {
+                "model": "/model", "run_name": "test", "api_base": "http://localhost:23333/v1",
+                "bench_base_path": "/tmp", "output_path": "/tmp",
+            },
+            "submit": {},
+        }
+        yaml_path = tmp_path / "test.yaml"
+        yaml_path.write_text(yaml.dump(config), encoding="utf-8")
+
+        from src.lmdeploy_pipeline.config import load_pipeline_config
+        cfg = load_pipeline_config(str(yaml_path))
+        assert cfg.docker.hf_repo_id == ""
+
+    def test_config_hf_repo_id_set(self, tmp_path):
+        """YAML에서 hf_repo_id 설정 시 정상 로드."""
+        config = {
+            "pipeline": {"name": "Test", "steps": {"docker": True, "evaluate": True, "submit": False}, "cleanup_docker": True},
+            "retry": {"max_attempts": 1, "wait_seconds": 5},
+            "docker": {
+                "container_name": "test",
+                "image": "test:latest",
+                "model_path": "ckpts/MyModel",
+                "hf_repo_id": "org/my-model",
+                "startup": {},
+            },
+            "evaluate": {
+                "model": "/model", "run_name": "test", "api_base": "http://localhost:23333/v1",
+                "bench_base_path": "/tmp", "output_path": "/tmp",
+            },
+            "submit": {},
+        }
+        yaml_path = tmp_path / "test.yaml"
+        yaml_path.write_text(yaml.dump(config), encoding="utf-8")
+
+        from src.lmdeploy_pipeline.config import load_pipeline_config
+        cfg = load_pipeline_config(str(yaml_path))
+        assert cfg.docker.hf_repo_id == "org/my-model"

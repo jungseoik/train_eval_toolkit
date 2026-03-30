@@ -8,7 +8,7 @@
 #   python -m src.lmdeploy_pipeline -c configs/lmdeploy_pipeline/internvl3_2b_fire.yaml
 #
 # 모델 교체 시 변경 필드:
-#   docker.model_path, evaluate.run_name, submit.model_name
+#   docker.model_path, docker.hf_repo_id, evaluate.run_name, submit.model_name
 # ============================================================
 
 pipeline:
@@ -28,6 +28,7 @@ docker:
   container_name: "internvl3_2b_lmdeploy"
   image: "openmmlab/lmdeploy:latest-cu12"
   model_path: "ckpts/InternVL3-2B_hyundai_8_20"     # 로컬 파인튜닝 모델 경로
+  # hf_repo_id: "PIA-SPACE-LAB/PIA_AI2team_VQA_fire"  # (선택) model_path에 모델이 없으면 HF에서 자동 다운로드
   container_model_path: "/model"                      # 컨테이너 내부 마운트 위치
   gpus: "all"
   port: 23333
@@ -50,6 +51,7 @@ evaluate:
   api_base: "http://127.0.0.1:23333/v1"
   bench_base_path: "/mnt/PoC_benchmark/huggingface_benchmarks_dataset/Leaderboard_bench"
   output_path: "results/lmdeploy_eval"
+  overwrite_results: true
 
   benchmarks:
     - "PIA_Fire"
