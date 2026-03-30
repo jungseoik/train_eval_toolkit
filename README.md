@@ -30,6 +30,7 @@ flowchart LR
 | 평가 | 비디오 정성 평가 (threshold + 오버레이) | `evaluate_qualitative_video_threshold_image.py` | [`docs/eval/eval_quality.md`](docs/eval/eval_quality.md) |
 | 평가 | vLLM 자동화 파이프라인 (Docker→평가→제출) | `python -m src.vllm_pipeline.cli` | [`docs/eval/vllm_pipeline.md`](docs/eval/vllm_pipeline.md) |
 | 평가 | LMDeploy 벤치마크 파이프라인 (파인튜닝 모델) | `python -m src.lmdeploy_pipeline` | [`docs/eval/lmdeploy_pipeline.md`](docs/eval/lmdeploy_pipeline.md) |
+| 평가 | 평가 요청 API (외부 YAML 요청 수신) | `uvicorn src.api.main:app` | [`docs/eval/pipeline_api.md`](docs/eval/pipeline_api.md) |
 | 배포 | LoRA 병합 후 추론용 체크포인트 생성 | `merge_lora.py` | `src/training/tools/merge_lora.py`, `scripts/pipe_line/train_eval_save_hyundai_8_20.sh` |
 
 ## 빠른 시작
@@ -274,6 +275,19 @@ docker:
 > 사전 준비 및 상세 가이드: [docs/eval/lmdeploy_pipeline.md](docs/eval/lmdeploy_pipeline.md)
 > YAML 설정 작성법: [docs/eval/lmdeploy_yaml_guide.md](docs/eval/lmdeploy_yaml_guide.md)
 
+#### 4-6) 평가 요청 API (외부 요청용)
+
+내부망에서 YAML 설정 파일을 전송하면 LMDeploy 벤치마크 평가를 자동 실행하는 API 서버입니다. SSE로 실시간 진행 상황을 확인할 수 있으며, GPU VRAM 사용량이 50GB 이상이면 요청을 거절합니다.
+
+```bash
+# 서버 주소: http://172.168.43.214:9000
+# YAML 파일로 평가 요청 (SSE 스트리밍 응답)
+curl -N -F 'file=@configs/lmdeploy_pipeline/internvl3_2b_fire.yaml' \
+  http://172.168.43.214:9000/pipeline/run/file
+```
+
+> 상세 가이드 (curl/Python 사용법, SSE 이벤트 설명, 에러 대처): [docs/eval/pipeline_api.md](docs/eval/pipeline_api.md)
+
 ### 5) 배포 (체크포인트 배포)
 
 이 저장소에서 배포는 서버 서빙이 아니라, **LoRA 병합 후 추론 가능한 체크포인트를 생성해 배포 가능한 상태로 만드는 것**을 의미합니다.
@@ -306,6 +320,7 @@ cp ckpts/InternVL3-2B/config.json ckpts/$MERGE_DIR/
 │   ├── evaluation/             # 정량/정성 평가
 │   ├── vllm_pipeline/          # vLLM 자동화 파이프라인 (Docker→평가→제출)
 │   ├── lmdeploy_pipeline/      # LMDeploy 벤치마크 파이프라인 (파인튜닝 모델)
+│   ├── api/                    # 평가 요청 API 서버 (docs/eval/pipeline_api.md)
 │   └── training/               # InternVL 학습/모델/도구
 ├── main.py                     # 통합 CLI 엔트리포인트
 ├── requirements.txt
