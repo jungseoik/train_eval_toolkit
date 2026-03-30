@@ -53,3 +53,9 @@ shortuuid
 tensorboardX
 termcolor
 pycocoevalcap
+
+# --- API Server (평가 요청 API) ---
+fastapi
+uvicorn
+python-multipart
+sse-starlette
