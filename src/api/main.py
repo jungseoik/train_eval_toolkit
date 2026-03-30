@@ -10,6 +10,7 @@ SSE(Server-Sent Events)로 실시간 진행 상황을 스트리밍.
 
 from __future__ import annotations
 
+import subprocess
 import threading
 import time
 
@@ -19,6 +20,45 @@ from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
 from .pipeline_worker import run_pipeline_sse, validate_yaml
+
+GPU_VRAM_THRESHOLD_MB = 50_000  # 50GB
+
+
+def check_gpu_vram() -> tuple[bool, str]:
+    """GPU VRAM 사용량을 확인한다.
+
+    Returns:
+        (True, 정보 문자열) 사용 가능 시,
+        (False, 에러 메시지) VRAM 초과 시.
+    """
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=index,memory.used,memory.total", "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if result.returncode != 0:
+            return True, "nvidia-smi 실행 실패 (체크 건너뜀)"
+
+        total_used_mb = 0
+        gpu_details = []
+        for line in result.stdout.strip().splitlines():
+            parts = [p.strip() for p in line.split(",")]
+            idx, used, total = parts[0], int(parts[1]), int(parts[2])
+            total_used_mb += used
+            gpu_details.append(f"GPU {idx}: {used}MB / {total}MB")
+
+        if total_used_mb > GPU_VRAM_THRESHOLD_MB:
+            detail = "\n".join(gpu_details)
+            return False, (
+                f"GPU가 현재 사용 중입니다 (VRAM 사용량: {total_used_mb / 1000:.1f}GB / 임계값: {GPU_VRAM_THRESHOLD_MB / 1000:.0f}GB).\n"
+                f"{detail}\n"
+                f"담당자에게 GPU 리소스에 대해 문의해주세요."
+            )
+
+        return True, f"VRAM 사용량: {total_used_mb / 1000:.1f}GB (여유 있음)"
+
+    except Exception as e:
+        return True, f"GPU 체크 실패: {e} (체크 건너뜀)"
 
 app = FastAPI(
     title="LMDeploy Pipeline API",
@@ -96,6 +136,15 @@ async def run_from_file(file: UploadFile = File(...)):
             "hint": "YAML 형식을 확인해주세요. 작성 가이드: docs/eval/lmdeploy_yaml_guide.md",
         })
 
+    # GPU VRAM 체크
+    gpu_ok, gpu_msg = check_gpu_vram()
+    if not gpu_ok:
+        _lock.release()
+        return JSONResponse(
+            status_code=503,
+            content={"status": "gpu_busy", "message": gpu_msg},
+        )
+
     _reset_state()
 
     return EventSourceResponse(
@@ -128,6 +177,15 @@ async def run_from_yaml(body: YamlRequest):
             "message": result,
             "hint": "YAML 형식을 확인해주세요. 작성 가이드: docs/eval/lmdeploy_yaml_guide.md",
         })
+
+    # GPU VRAM 체크
+    gpu_ok, gpu_msg = check_gpu_vram()
+    if not gpu_ok:
+        _lock.release()
+        return JSONResponse(
+            status_code=503,
+            content={"status": "gpu_busy", "message": gpu_msg},
+        )
 
     _reset_state()
 
