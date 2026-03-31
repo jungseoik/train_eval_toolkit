@@ -188,7 +188,7 @@ python -m src.lmdeploy_pipeline -c configs/lmdeploy_pipeline/internvl3_2b_fire.y
 | `evaluate.benchmarks` | list | `[]` | 평가 벤치마크 목록 |
 | `evaluate.window_size` | int | `15` | 프레임 샘플링 간격 |
 | `evaluate.interpolation` | str | `"forward"` | 미샘플 프레임 채우기 방식 |
-| `evaluate.concurrency` | int | `10` | 동시 요청 수 |
+| `evaluate.concurrency` | int | `10` | 동시 처리 수 |
 | `evaluate.jpeg_quality` | int | `95` | JPEG 인코딩 품질 |
 | `evaluate.max_tokens` | int | `15` | 최대 생성 토큰 수 |
 | `evaluate.temperature` | float | `0.0` | 샘플링 온도 |

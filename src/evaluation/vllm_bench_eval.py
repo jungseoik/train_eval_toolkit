@@ -121,7 +121,6 @@ def _extract_frame_jpeg_sync(video_path: Path, frame_idx: int, jpeg_quality: int
 
 async def _infer_frame(
     client: httpx.AsyncClient,
-    semaphore: asyncio.Semaphore,
     api_url: str,
     model: str,
     image_b64: str,
@@ -149,11 +148,10 @@ async def _infer_frame(
         "temperature": temperature,
         "seed": seed,
     }
-    async with semaphore:
-        resp = await client.post(api_url, json=payload)
-        resp.raise_for_status()
-        data = resp.json()
-        return data["choices"][0]["message"]["content"]
+    resp = await client.post(api_url, json=payload)
+    resp.raise_for_status()
+    data = resp.json()
+    return data["choices"][0]["message"]["content"]
 
 
 # ============================================================
@@ -264,36 +262,37 @@ async def _evaluate_video_async(
     loop = asyncio.get_event_loop()
 
     async def process_frame(fidx: int) -> tuple[int, int]:
-        b64 = await loop.run_in_executor(
-            None, _extract_frame_jpeg_sync, video_path, fidx, cfg.JPEG_QUALITY
-        )
-        if b64 is None:
-            warnings.warn(f"Frame extraction failed: {video_path.name} frame={fidx}")
-            return fidx, 0
-        try:
-            raw_text = await _infer_frame(
-                client, semaphore, api_url,
-                cfg.MODEL, b64, prompt,
-                cfg.MAX_TOKENS, cfg.TEMPERATURE, cfg.SEED,
+        async with semaphore:
+            b64 = await loop.run_in_executor(
+                None, _extract_frame_jpeg_sync, video_path, fidx, cfg.JPEG_QUALITY
             )
-            pred = classify(parse_model_output(raw_text, valid_values), category)
-        except Exception as exc:
-            warnings.warn(f"Inference failed for {video_path.name} frame={fidx}: {exc}, retrying...")
-            # 1회 재시도
+            if b64 is None:
+                warnings.warn(f"Frame extraction failed: {video_path.name} frame={fidx}")
+                return fidx, 0
             try:
                 raw_text = await _infer_frame(
-                    client, semaphore, api_url,
+                    client, api_url,
                     cfg.MODEL, b64, prompt,
                     cfg.MAX_TOKENS, cfg.TEMPERATURE, cfg.SEED,
                 )
                 pred = classify(parse_model_output(raw_text, valid_values), category)
-            except Exception as retry_exc:
-                raise InferenceAbortError(
-                    bench=bench_name,
-                    video=video_path.name,
-                    frame=fidx,
-                    cause=retry_exc,
-                )
+            except Exception as exc:
+                warnings.warn(f"Inference failed for {video_path.name} frame={fidx}: {exc}, retrying...")
+                # 1회 재시도
+                try:
+                    raw_text = await _infer_frame(
+                        client, api_url,
+                        cfg.MODEL, b64, prompt,
+                        cfg.MAX_TOKENS, cfg.TEMPERATURE, cfg.SEED,
+                    )
+                    pred = classify(parse_model_output(raw_text, valid_values), category)
+                except Exception as retry_exc:
+                    raise InferenceAbortError(
+                        bench=bench_name,
+                        video=video_path.name,
+                        frame=fidx,
+                        cause=retry_exc,
+                    )
         return fidx, pred
 
     async with httpx.AsyncClient(limits=limits, timeout=300.0) as client:
