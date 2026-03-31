@@ -317,6 +317,20 @@ async def _evaluate_video_async(
 
 
 # ============================================================
+# 예외
+# ============================================================
+
+
+class BenchmarkSkipError(RuntimeError):
+    """벤치마크 경로/데이터 문제로 스킵해야 할 때 발생."""
+
+    def __init__(self, bench_name: str, reason: str):
+        self.bench_name = bench_name
+        self.reason = reason
+        super().__init__(f"[{bench_name}] {reason}")
+
+
+# ============================================================
 # 단일 벤치마크 평가
 # ============================================================
 
@@ -334,8 +348,7 @@ def evaluate_benchmark(bench_name: str, cfg: ModuleType) -> None:
     """
     bench_path = Path(cfg.BENCH_BASE_PATH) / bench_name
     if not bench_path.exists():
-        print(f"[SKIP] Benchmark path not found: {bench_path}")
-        return
+        raise BenchmarkSkipError(bench_name, f"Benchmark path not found: {bench_path}")
 
     category = get_category_from_bench(bench_name)
 
@@ -348,12 +361,13 @@ def evaluate_benchmark(bench_name: str, cfg: ModuleType) -> None:
     try:
         pairs = find_video_gt_pairs(bench_path, category)
     except FileNotFoundError as exc:
-        print(f"[ERROR] {exc}")
-        return
+        raise BenchmarkSkipError(bench_name, str(exc)) from exc
 
     if not pairs:
-        print("[SKIP] No (mp4, csv) pairs found.")
-        return
+        raise BenchmarkSkipError(
+            bench_name,
+            f"No (mp4, csv) pairs found in {bench_path}/dataset/{category}",
+        )
 
     print(f"Videos    : {len(pairs)}")
 

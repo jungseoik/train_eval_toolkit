@@ -9,11 +9,12 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import subprocess
-import tempfile
 import threading
 import time
 import os
+from pathlib import Path
 from typing import AsyncGenerator
 
 import yaml
@@ -59,12 +60,60 @@ def validate_yaml(yaml_content: str) -> tuple[bool, str | dict]:
     return True, config
 
 
-def save_yaml_to_temp(yaml_content: str) -> str:
-    """YAML 문자열을 임시 파일로 저장하고 경로를 반환한다."""
-    fd, path = tempfile.mkstemp(suffix=".yaml", prefix="pipeline_")
-    with os.fdopen(fd, "w") as f:
-        f.write(yaml_content)
-    return path
+UPLOADED_YAML_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "uploaded_yamls"
+
+
+def save_yaml_permanent(yaml_content: str, pipeline_name: str = "unknown") -> str:
+    """YAML을 영구 저장 디렉토리에 저장하고 경로를 반환한다."""
+    UPLOADED_YAML_DIR.mkdir(parents=True, exist_ok=True)
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    safe_name = re.sub(r"[^\w\-]", "_", pipeline_name)[:80]
+    filename = f"{timestamp}_{safe_name}.yaml"
+    path = UPLOADED_YAML_DIR / filename
+    path.write_text(yaml_content, encoding="utf-8")
+    return str(path)
+
+
+def validate_paths(config: dict) -> tuple[bool, str | None]:
+    """YAML 설정의 파일시스템 경로를 검증한다.
+
+    Returns:
+        (True, None) 또는 (False, error_message)
+    """
+    errors: list[str] = []
+    evaluate = config.get("evaluate", {})
+
+    # 1) bench_base_path 존재 여부
+    bench_base = evaluate.get("bench_base_path", "")
+    if not bench_base:
+        errors.append("evaluate.bench_base_path가 지정되지 않았습니다.")
+    elif not Path(bench_base).exists():
+        errors.append(f"bench_base_path가 존재하지 않습니다: {bench_base}")
+
+    # 2) benchmarks 리스트 비어있는지
+    benchmarks = evaluate.get("benchmarks", [])
+    if not benchmarks:
+        errors.append("evaluate.benchmarks가 비어 있습니다.")
+
+    # 3) 각 벤치마크 폴더 존재 여부 (bench_base가 존재할 때만)
+    if bench_base and Path(bench_base).exists() and benchmarks:
+        missing = [b for b in benchmarks if not (Path(bench_base) / b).exists()]
+        if missing:
+            errors.append(
+                f"벤치마크 폴더를 찾을 수 없습니다 ({len(missing)}/{len(benchmarks)}개): "
+                f"{', '.join(missing)}"
+            )
+
+    # 4) output_path 쓰기 가능 여부
+    output_path = evaluate.get("output_path", "")
+    if output_path:
+        out = Path(output_path)
+        if out.exists() and not os.access(str(out), os.W_OK):
+            errors.append(f"output_path에 쓰기 권한이 없습니다: {output_path}")
+
+    if errors:
+        return False, "\n".join(errors)
+    return True, None
 
 
 def _get_error_hint(error: Exception) -> str:
@@ -107,11 +156,27 @@ def _background_eval_submit_cleanup(
 
         n_success = len(eval_result["success"])
         n_failed = len(eval_result["failed"])
-        state["status"] = "completed"
-        state["result"] = f"평가 완료: {n_success}/{n_success + n_failed} 벤치마크 성공"
-        if eval_result["failed"]:
+        n_total = n_success + n_failed
+
+        if n_success == 0 and n_total > 0:
+            # 전부 실패
+            state["status"] = "failed"
             failed_names = [f["benchmark"] for f in eval_result["failed"]]
-            state["result"] += f", 실패: {', '.join(failed_names)}"
+            first_error = eval_result["failed"][0].get("error", "unknown")
+            state["error"] = f"모든 벤치마크({n_total}개)가 실패했습니다: {', '.join(failed_names)}"
+            state["hint"] = f"첫 번째 에러: {first_error}"
+        elif n_failed > 0:
+            # 일부 실패
+            state["status"] = "completed"
+            failed_names = [f["benchmark"] for f in eval_result["failed"]]
+            state["result"] = (
+                f"평가 완료: {n_success}/{n_total} 벤치마크 성공, "
+                f"실패: {', '.join(failed_names)}"
+            )
+        else:
+            # 전부 성공
+            state["status"] = "completed"
+            state["result"] = f"평가 완료: {n_success}/{n_total} 벤치마크 성공"
 
     except Exception as e:
         state["status"] = "failed"
@@ -128,12 +193,6 @@ def _background_eval_submit_cleanup(
                 stop_container(cfg.docker.container_name)
             except Exception:
                 pass
-
-        # 임시 파일 삭제
-        try:
-            os.remove(yaml_path)
-        except OSError:
-            pass
 
         state["finished_at"] = time.strftime("%Y-%m-%dT%H:%M:%S")
         lock.release()
@@ -166,8 +225,9 @@ async def run_pipeline_sse(
 
         yield sse_event("yaml_validated", "YAML 검증 완료")
 
-        # 2. 임시 파일 저장 + config 로드
-        yaml_path = save_yaml_to_temp(yaml_content)
+        # 2. YAML 영구 저장 + config 로드
+        pipeline_name_raw = result.get("pipeline", {}).get("name", "unknown")
+        yaml_path = save_yaml_permanent(yaml_content, pipeline_name_raw)
         try:
             cfg = await loop.run_in_executor(None, load_pipeline_config, yaml_path)
         except Exception as e:
@@ -252,16 +312,7 @@ async def run_pipeline_sse(
     finally:
         # 백그라운드 스레드가 시작되지 않았으면 여기서 정리
         if not background_started:
-            if yaml_path:
-                _safe_remove(yaml_path)
             state["status"] = "idle"
             state["finished_at"] = time.strftime("%Y-%m-%dT%H:%M:%S")
             if lock.locked():
                 lock.release()
-
-
-def _safe_remove(path: str) -> None:
-    try:
-        os.remove(path)
-    except OSError:
-        pass

@@ -10,7 +10,7 @@ from __future__ import annotations
 import time
 from types import SimpleNamespace
 
-from src.evaluation.lmdeploy_bench_eval import evaluate_benchmark
+from src.evaluation.lmdeploy_bench_eval import BenchmarkSkipError, evaluate_benchmark
 
 from .config import EvalConfig
 
@@ -68,6 +68,11 @@ def run_evaluation(eval_cfg: EvalConfig, retry_max: int, retry_wait: int) -> dic
                     print(f"[EVAL] Retry {attempt}/{retry_max} for {bench_name}")
                 evaluate_benchmark(bench_name, cfg)
                 succeeded = True
+                break
+            except BenchmarkSkipError as e:
+                # 경로/데이터 문제는 재시도해도 해결 안 됨
+                last_error = str(e)
+                print(f"[EVAL] SKIP (failure): {e}")
                 break
             except Exception as e:
                 last_error = str(e)

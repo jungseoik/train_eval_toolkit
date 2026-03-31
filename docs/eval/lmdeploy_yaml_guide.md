@@ -210,6 +210,10 @@ LMDeploy 서버에 전달되는 인자입니다.
 | `api_base` | `"http://127.0.0.1:23333/v1"` | `docker.port`와 일치해야 함. 로컬 LMDeploy 서버 주소 |
 | `bench_base_path` | `"/mnt/PoC_benchmark/..."` | 서버에 마운트된 벤치마크 데이터셋 경로. 모든 벤치마크 데이터가 이 경로 하위에 존재 |
 
+> **주의**: `bench_base_path`는 서버에 실제로 마운트된 경로여야 합니다.
+> API 요청 시 경로가 올바르지 않거나 벤치마크 폴더가 존재하지 않으면 즉시 **HTTP 400 에러**를 반환합니다.
+> 올바른 경로: `/mnt/PoC_benchmark/huggingface_benchmarks_dataset/Leaderboard_bench`
+
 #### 변경 가능 필드
 
 | 필드 | 설명 |
