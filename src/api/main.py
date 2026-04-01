@@ -73,9 +73,11 @@ _state: dict = {
     "pipeline_name": None,
     "started_at": None,
     "finished_at": None,
+    "elapsed": None,
     "error": None,
     "hint": None,
     "result": None,
+    "progress": None,
 }
 
 
@@ -85,9 +87,11 @@ def _reset_state() -> None:
         "pipeline_name": None,
         "started_at": None,
         "finished_at": None,
+        "elapsed": None,
         "error": None,
         "hint": None,
         "result": None,
+        "progress": None,
     })
 
 
