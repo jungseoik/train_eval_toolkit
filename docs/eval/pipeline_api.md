@@ -206,7 +206,7 @@ if status.get("error"):
 | `docker_waiting` | 서버 대기 | LMDeploy API 서버 준비 대기 중 |
 | `docker_ready` | 서버 준비 완료 | API 서버 응답 확인, 소요 시간 포함 |
 | `eval_started` | 평가 시작 | 벤치마크 평가 시작됨 |
-| `done` | 완료 | SSE 스트리밍 종료. 평가는 백그라운드에서 계속 진행 |
+| `done` | 완료 | SSE 스트리밍 종료. 평가는 백그라운드 subprocess에서 계속 진행 |
 | `error` | 에러 | 에러 발생. `message`에 에러 내용, `hint`에 대처법 포함 |
 
 ### SSE 출력 예시

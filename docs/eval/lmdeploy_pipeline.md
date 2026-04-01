@@ -96,12 +96,16 @@ huggingface-cli download PIA-SPACE-LAB/PIA_AI2team_VQA_falldown \
         ↓
 Docker 컨테이너 기동 (LMDeploy API 서버)
         ↓
-벤치마크 평가 (프레임 단위 추론)
+벤치마크 평가 (벤치마크별 subprocess 분리, 내부에서 프레임 단위 병렬 추론)
         ↓
 결과 제출 (Gradio 리더보드)
         ↓
 컨테이너 정리
 ```
+
+각 벤치마크는 독립적인 subprocess(`multiprocessing.Process`)에서 실행됩니다.
+subprocess 종료 시 OS가 메모리를 100% 회수하므로 장시간 평가에서도 메모리가 안정적으로 유지됩니다.
+벤치마크 내부의 프레임 단위 병렬 처리(`concurrency`)는 그대로 유지됩니다.
 
 ---
 
@@ -265,7 +269,7 @@ src/lmdeploy_pipeline/
     config.py            # YAML 파싱 및 dataclass 정의
     model_downloader.py  # 모델 존재 확인 및 HuggingFace 다운로드
     docker_manager.py    # LMDeploy Docker 생명주기 관리
-    evaluator.py         # 평가 래퍼
+    evaluator.py         # 평가 래퍼 (벤치마크별 subprocess 분리 실행)
     submitter.py         # Gradio 제출
     runner.py            # 파이프라인 오케스트레이터
 
