@@ -56,7 +56,7 @@ API 서버 (90MB 유지)
 
 ## 검증 결과
 
-### 메모리 테스트 (실제 cv2, KISA_Falldown 20개 영상)
+### 메모리 테스트 1 (cv2만, KISA_Falldown 20개 영상)
 
 ```
 기존 방식 (in-process):
@@ -68,6 +68,25 @@ subprocess 방식:
 
 절감율: 100%
 ```
+
+### 메모리 테스트 2 (실제 lmdeploy 추론, Soil_Falldown 77개 영상 × 3회 반복)
+
+concurrency=100, vision-max-batch-size=1 설정으로 실제 추론 수행.
+
+```
+  회차       in-process   subprocess
+  ----------------------------------
+  1회         1,777 MB      1,830 MB
+  2회         1,881 MB      1,830 MB
+  3회         1,830 MB      1,830 MB
+  ----------------------------------
+  증가        +1,760 MB        +0 MB
+
+  절감율: 100%
+```
+
+in-process는 71MB에서 1,830MB까지 증가 후 OS에 반환되지 않음.
+subprocess는 부모 프로세스 RSS 증가 없음 (3회 반복해도 동일).
 
 ### 호환성 확인
 
