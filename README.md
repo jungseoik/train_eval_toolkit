@@ -284,6 +284,9 @@ docker:
 # YAML 파일로 평가 요청 (SSE 스트리밍 응답)
 curl -N -F 'file=@configs/lmdeploy_pipeline/internvl3_2b_fire.yaml' \
   http://172.168.43.214:9000/pipeline/run/file
+
+# 진행도 조회 (벤치마크/영상/프레임 단위)
+curl http://172.168.43.214:9000/pipeline/status
 ```
 
 > 상세 가이드 (curl/Python 사용법, SSE 이벤트 설명, 에러 대처): [docs/eval/pipeline_api.md](docs/eval/pipeline_api.md)
