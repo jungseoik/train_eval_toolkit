@@ -348,7 +348,11 @@ def _update_video_progress(
     video_done: int, video_total: int,
     frame_done: int = 0, frame_total: int = 0,
 ) -> None:
-    """progress_state의 현재 벤치마크에 영상/프레임 진행도를 기록한다."""
+    """progress_state의 현재 벤치마크에 영상/프레임 진행도를 기록한다.
+
+    state에 '_progress_file' 키가 있으면 JSON 파일에도 기록한다.
+    (subprocess 실행 시 부모 프로세스에 진행도를 전달하기 위함)
+    """
     if state is None or bench_idx is None or state.get("progress") is None:
         return
     entry = state["progress"]["benchmarks"][bench_idx]
@@ -357,6 +361,20 @@ def _update_video_progress(
         entry["frame"] = f"{frame_done}/{frame_total}"
     elif "frame" in entry:
         del entry["frame"]
+
+    # 파일 기반 progress 전달 (subprocess 모드)
+    progress_file = state.get("_progress_file")
+    if progress_file:
+        try:
+            import json, os, tempfile
+            # atomic write: 임시파일에 쓰고 rename
+            dir_name = os.path.dirname(progress_file)
+            fd, tmp = tempfile.mkstemp(dir=dir_name, suffix=".tmp")
+            with os.fdopen(fd, "w") as f:
+                json.dump({"progress": state["progress"]}, f)
+            os.replace(tmp, progress_file)
+        except Exception:
+            pass
 
 
 def evaluate_benchmark(
