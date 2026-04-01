@@ -126,6 +126,8 @@ def run_pipeline(yaml_path: str, override_steps: list[str] | None = None) -> Non
         if steps.get("evaluate", False):
             eval_result = run_evaluation(
                 cfg.evaluate, cfg.retry_max_attempts, cfg.retry_wait_seconds,
+                docker_cfg=cfg.docker,
+                docker_restart_interval=cfg.docker_restart_interval,
             )
             eval_success_benchmarks = eval_result["success"]
             n_success = len(eval_result["success"])

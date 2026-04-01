@@ -4,7 +4,12 @@
 
 Docker 컨테이너 실행, 벤치마크 평가, 결과 제출, 정리까지 이어지는 3단계 수동 프로세스를 YAML 설정 파일 하나로 자동화하는 파이프라인입니다. 모델만 교체하면 동일한 흐름으로 빠르게 테스트할 수 있습니다.
 
-**자동화 흐름**: Docker 컨테이너 기동 → vLLM 서버 준비 대기 → 벤치마크 평가 → 결과 제출 → 컨테이너 정리
+**자동화 흐름**: Docker 컨테이너 기동 → vLLM 서버 준비 대기 → 벤치마크 평가 (벤치마크별 subprocess 분리 + Docker 재시작) → 결과 제출 → 컨테이너 정리
+
+각 벤치마크는 독립 subprocess에서 실행되어 메모리 누적이 방지됩니다.
+`docker_restart_interval: 1`(기본값)이면 매 벤치마크 사이에 Docker를 재시작하여 서버 측 메모리도 초기화합니다.
+
+> 프로세스 설계 배경 및 상세 흐름도: [eval_process_design.md](eval_process_design.md)
 
 ---
 
@@ -36,6 +41,7 @@ python -m src.vllm_pipeline.cli -c configs/vllm_pipeline/qwen35_2b_fire.yaml --s
 | `pipeline.steps.evaluate` | bool | true | 벤치마크 평가 단계 실행 여부 |
 | `pipeline.steps.submit` | bool | true | 결과 제출 단계 실행 여부 |
 | `pipeline.cleanup_docker` | bool | true | 종료 후 Docker 컨테이너 자동 제거 (GPU 반환) |
+| `pipeline.docker_restart_interval` | int | 1 | 벤치마크 N개마다 Docker 재시작하여 서버 메모리 해소 (0=비활성) |
 
 ### retry 섹션
 
@@ -128,7 +134,7 @@ src/vllm_pipeline/
     __main__.py          # python -m src.vllm_pipeline 진입점
     config.py            # YAML 파싱 + dataclass
     docker_manager.py    # Docker 생명주기 관리
-    evaluator.py         # 평가 래퍼 (기존 vllm_bench_eval.py 활용)
+    evaluator.py         # 평가 래퍼 (벤치마크별 subprocess 분리 실행)
     submitter.py         # Gradio 제출
     runner.py            # 파이프라인 오케스트레이터
     cli.py               # CLI 진입점

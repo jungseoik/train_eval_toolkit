@@ -233,7 +233,7 @@ PYTHONPATH="$(pwd)" torchrun --nproc_per_node=2 src/evaluation/evaluate_video_cl
 
 #### 4-4) vLLM 자동화 파이프라인 (Docker → 평가 → 제출)
 
-YAML 설정 하나로 Docker 컨테이너 기동부터 벤치마크 평가, 결과 제출, 컨테이너 정리까지 자동 실행합니다.
+YAML 설정 하나로 Docker 컨테이너 기동부터 벤치마크 평가, 결과 제출, 컨테이너 정리까지 자동 실행합니다. 각 벤치마크는 독립 subprocess에서 실행되어 메모리가 안정적으로 유지됩니다.
 
 ```bash
 conda activate llm

@@ -1,6 +1,7 @@
 # 평가 프로세스 설계 문서
 
-LMDeploy 벤치마크 평가 파이프라인의 프로세스 구조와 설계 배경을 정리한 문서.
+LMDeploy / vLLM 벤치마크 평가 파이프라인의 프로세스 구조와 설계 배경을 정리한 문서.
+두 파이프라인은 동일한 subprocess 분리 + Docker 재시작 아키텍처를 공유한다.
 
 ---
 
@@ -174,9 +175,27 @@ evaluate:
 
 ---
 
+## 적용 범위
+
+이 설계는 LMDeploy와 vLLM 파이프라인 **모두**에 동일하게 적용된다.
+
+| 파이프라인 | evaluator | bench_eval | config |
+|-----------|-----------|------------|--------|
+| LMDeploy | `src/lmdeploy_pipeline/evaluator.py` | `src/evaluation/lmdeploy_bench_eval.py` | `src/lmdeploy_pipeline/config.py` |
+| vLLM | `src/vllm_pipeline/evaluator.py` | `src/evaluation/vllm_bench_eval.py` | `src/vllm_pipeline/config.py` |
+
+두 파이프라인 모두:
+- 벤치마크별 subprocess 분리 (메모리 누적 방지)
+- `docker_restart_interval` 설정 지원 (서버 메모리 초기화)
+- 프레임 단위 병렬 처리 (asyncio + Semaphore)
+- 파일 기반 progress IPC
+
+---
+
 ## 관련 문서
 
 - [메모리 분석 상세](memory_analysis.md) — OOM 발생 이력, 프로세스별 메모리 분석 데이터
 - [LMDeploy 파이프라인 가이드](lmdeploy_pipeline.md) — 사용법, 사전 준비, 파일 구조
-- [YAML 설정 가이드](lmdeploy_yaml_guide.md) — 설정 필드 설명
+- [vLLM 파이프라인 가이드](vllm_pipeline.md) — 사용법, 사전 준비, 파일 구조
+- [YAML 설정 가이드 (LMDeploy)](lmdeploy_yaml_guide.md) — 설정 필드 설명
 - [평가 API 가이드](pipeline_api.md) — API 서버 사용법, SSE 이벤트
