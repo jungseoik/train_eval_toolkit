@@ -67,7 +67,7 @@ evaluate:
   interpolation: "forward"
 
   # 추론 파라미터
-  concurrency: 10
+  concurrency: 100
   jpeg_quality: 95
   max_tokens: 15
   temperature: 0.0
