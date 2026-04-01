@@ -39,7 +39,7 @@ docker:
     tp: 1
     session-len: 8192
     backend: "pytorch"
-    cache-max-entry-count: 0.8   # KV cache GPU 메모리 비율 (0.0~1.0, 기본 0.8)
+    cache-max-entry-count: 0.1     # KV cache GPU 메모리 비율 (max_tokens=15이라 10%면 충분)
   startup:
     timeout_seconds: 300
     poll_interval_seconds: 5
