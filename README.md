@@ -274,6 +274,7 @@ docker:
 
 > 사전 준비 및 상세 가이드: [docs/eval/lmdeploy_pipeline.md](docs/eval/lmdeploy_pipeline.md)
 > YAML 설정 작성법: [docs/eval/lmdeploy_yaml_guide.md](docs/eval/lmdeploy_yaml_guide.md)
+> 프로세스 설계 배경 및 흐름도: [docs/eval/eval_process_design.md](docs/eval/eval_process_design.md)
 
 #### 4-6) 평가 요청 API (외부 요청용)
 
