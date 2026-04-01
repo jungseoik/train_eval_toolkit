@@ -4,6 +4,12 @@
 # Cosmos-Reason2-2B 모델의 Falldown 벤치마크 테스트용.
 # (테스트셋 평가 Precision/Recall/F1 과는 별개 프로세스)
 #
+# [Cosmos-Reason2 주의사항]
+#   - Qwen3-VL 기반 모델, gated model이므로 HF 라이선스 동의 필요
+#   - reasoning-parser 사용 시 매 요청마다 think 토큰 생성 → 속도 대폭 저하
+#   - 단순 분류 작업은 reasoning-parser 제거 (non-reasoning 모드) 권장
+#   - kv-cache-memory-bytes를 너무 높게 잡으면 OOM 크래시 위험 (30G 권장)
+#
 # 사용법:
 #   python -m src.vllm_pipeline -c configs/vllm_pipeline/cosmos_reason2_2b_falldown.yaml
 #
@@ -35,12 +41,12 @@ docker:
   model: "nvidia/Cosmos-Reason2-2B"
   vllm_args:
     tensor-parallel-size: 1
-    max-model-len: 16384
-    kv-cache-memory-bytes: "70G"
+    max-model-len: 16384             # Cosmos-Reason2 권장: 8192~16384
+    kv-cache-memory-bytes: "10G"     # 70G 이상 시 OOM 크래시 위험
     max-num-seqs: 128
     max-num-batched-tokens: 131072
     limit-mm-per-prompt: '{"image": 1}'
-    reasoning-parser: qwen3
+    # reasoning-parser: qwen3        # 단순 분류에는 불필요 (활성화 시 think 토큰 생성으로 속도 저하)
     seed: 0
   startup:
     timeout_seconds: 300
@@ -72,7 +78,7 @@ evaluate:
     - "Yonsei_Falldown"
 
   # 프레임 샘플링
-  window_size: 15
+  window_size: 30
   interpolation: "forward"
 
   # 추론 파라미터

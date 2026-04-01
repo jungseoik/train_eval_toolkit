@@ -60,7 +60,7 @@ def validate_yaml(yaml_content: str) -> tuple[bool, str | dict]:
     return True, config
 
 
-UPLOADED_YAML_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "uploaded_yamls"
+UPLOADED_YAML_DIR = Path(__file__).resolve().parent.parent.parent / "results" / "api" / "uploaded_yamls"
 
 
 def save_yaml_permanent(yaml_content: str, pipeline_name: str = "unknown") -> str:
@@ -196,6 +196,24 @@ def _background_eval_submit_cleanup(
                 pass
 
         state["finished_at"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+
+        # 총 소요 시간 계산
+        if state.get("started_at"):
+            try:
+                t0 = time.strptime(state["started_at"], "%Y-%m-%dT%H:%M:%S")
+                t1 = time.strptime(state["finished_at"], "%Y-%m-%dT%H:%M:%S")
+                elapsed = int(time.mktime(t1) - time.mktime(t0))
+                m, s = divmod(elapsed, 60)
+                h, m = divmod(m, 60)
+                if h > 0:
+                    state["elapsed"] = f"{h}시간 {m}분 {s}초"
+                elif m > 0:
+                    state["elapsed"] = f"{m}분 {s}초"
+                else:
+                    state["elapsed"] = f"{s}초"
+            except Exception:
+                pass
+
         lock.release()
 
 

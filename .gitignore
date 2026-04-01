@@ -237,3 +237,5 @@ test.mp4
 .claude
 .docs/
 pytest.ini
+lmdeploy/*
+cosmos-reason2/*
