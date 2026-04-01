@@ -1,0 +1,123 @@
+# ============================================================
+# LMDeploy 벤치마크 평가 파이프라인 설정 - Falldown
+#
+# PIA_AI2team_VQA_falldown_v0.1 모델의 벤치마크 테스트용.
+# (테스트셋 평가 Precision/Recall/F1 과는 별개 프로세스)
+#
+# 사용법:
+#   python -m src.lmdeploy_pipeline -c configs/lmdeploy_pipeline/PIA_AI2team_VQA_falldown_v0.1.yaml
+#
+# 모델 교체 시 변경 필드:
+#   docker.model_path, docker.hf_repo_id, evaluate.run_name, submit.model_name
+# ============================================================
+
+pipeline:
+  name: "PIA_AI2team_VQA_falldown_v0.1 Benchmark (LMDeploy)"
+  steps:
+    docker: true
+    evaluate: true
+    submit: true
+  cleanup_docker: true
+
+retry:
+  max_attempts: 3
+  wait_seconds: 30
+
+# -- Docker 설정 --
+docker:
+  container_name: "pia_ai2team_vqa_falldown_v0.1_lmdeploy"
+  image: "openmmlab/lmdeploy:latest-cu12"
+  model_path: "ckpts/PIA_AI2team_VQA_falldown_v0.1"
+  hf_repo_id: "PIA-SPACE-LAB/PIA_AI2team_VQA_falldown_v0.1"  # model_path에 모델이 없으면 HF에서 자동 다운로드
+  container_model_path: "/model"
+  gpus: "all"
+  port: 23333
+  ipc: "host"
+  volumes: []
+  lmdeploy_args:
+    tp: 1
+    session-len: 8192
+    backend: "pytorch"
+    cache-max-entry-count: 0.1   # KV cache GPU 메모리 비율 (0.0~1.0, 프레임 단위 독립 추론은 낮게)
+  startup:
+    timeout_seconds: 300
+    poll_interval_seconds: 5
+    stream_logs: true
+
+# -- 평가 설정 --
+evaluate:
+  model: "/model"
+  run_name: "PIA_AI2team_VQA_falldown_v0.1"
+  api_base: "http://127.0.0.1:23333/v1"
+  bench_base_path: "/mnt/PoC_benchmark/huggingface_benchmarks_dataset/Leaderboard_bench"
+  output_path: "results/lmdeploy_eval"
+  overwrite_results: false
+
+  benchmarks:
+    - "ABB_Falldown"
+    - "Coupang_Falldown"
+    - "DTRO_Falldown"
+    - "GangNam_Falldown"
+    - "Hyundai_Falldown"
+    - "Innodep_Falldown"
+    - "KhonKaen_Falldown"
+    - "KISA_Falldown"
+    - "Kumho_Falldown"
+    - "PIA_Falldown"
+    - "Soil_Falldown"
+    - "UGO_Falldown"
+    - "Yonsei_Falldown"
+
+  # 프레임 샘플링
+  window_size: 30
+  interpolation: "forward"
+
+  # 추론 파라미터
+  concurrency: 10
+  jpeg_quality: 95
+  max_tokens: 15
+  temperature: 0.0
+  seed: 0
+  negative_label: "normal"
+
+  # 카테고리별 프롬프트
+  prompt_templates:
+    falldown: |
+      Analyze this image carefully. Determine if a person has fallen down.
+
+      Important classification rules:
+
+      - The "falldown" category applies to any person who is lying down, regardless of:
+        - the surface (e.g., floor, mattress, bed)
+        - the posture (natural or unnatural)
+        - the cause (e.g., sleeping, collapsing, lying intentionally)
+      - This includes:
+        - A person lying flat on the ground or other surfaces
+        - A person collapsed or sprawled in any lying position
+      - The "normal" category applies only if the person is:
+        - sitting
+        - standing
+        - kneeling
+        - or otherwise upright (not lying down)
+
+      Answer in JSON format with BOTH of the following fields:
+      - "category": either "falldown" or "normal"
+      - "description": a brief reason why this classification was made (e.g., "person lying on a mattress", "person sitting on sofa")
+
+      Example:
+      {
+        "category": "falldown",
+        "description": "person lying on a mattress in natural posture"
+      }
+
+    default: "Is {category} visible in this image? Answer only with 0 (no) or 1 (yes)."
+
+# -- 제출 설정 --
+submit:
+  gradio_url: "http://172.168.47.39:7860/"
+  model_name: "PIA_AI2team_VQA_falldown_v0.1"
+  task_name: "🌠 VLM 🖥️"
+  datasets_used: "Finetuned"
+  config_file: "config.json"
+  results_base_dir: "results/lmdeploy_eval"
+  interval_seconds: 60

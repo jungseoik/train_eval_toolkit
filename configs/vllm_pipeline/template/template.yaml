@@ -1,0 +1,179 @@
+# ============================================================
+# vLLM 벤치마크 평가 파이프라인 설정 - 템플릿
+#
+# 이 파일을 복사한 뒤 "<-- 변경" 표시된 필드만 수정하세요.
+# "<-- 고정값" 표시된 필드는 서버 환경에 종속된 값이므로 변경하지 마세요.
+#
+# 사용법:
+#   1. cp configs/vllm_pipeline/template/template.yaml configs/vllm_pipeline/{모델명}_{카테고리}.yaml
+#   2. "<-- 변경" 필드 수정
+#   3. python -m src.vllm_pipeline -c configs/vllm_pipeline/{모델명}_{카테고리}.yaml
+#
+# 모델 교체 시 변경 필드:
+#   docker.model, evaluate.model, evaluate.run_name, submit.model_name
+#
+# 상세 가이드: docs/eval/vllm_pipeline.md
+# ============================================================
+
+pipeline:
+  name: "{모델명} {카테고리} Benchmark"                  # <-- 변경
+  steps:
+    docker: true
+    evaluate: true
+    submit: true
+  cleanup_docker: true
+
+retry:
+  max_attempts: 3
+  wait_seconds: 30
+
+# ── Docker 설정 ──
+docker:
+  container_name: "{모델명}_vllm"                        # <-- 변경: 고유한 컨테이너 이름
+  image: "vllm/vllm-openai:cu130-nightly"                # <-- 고정값
+  gpus: "all"
+  port: 8000
+  ipc: "host"
+  volumes:
+    - "~/.cache/huggingface:/root/.cache/huggingface"
+  model: "{HuggingFace 모델 ID}"                         # <-- 변경: 예) "Qwen/Qwen3.5-2B"
+  vllm_args:
+    tensor-parallel-size: 1
+    max-model-len: 8192              # 모델에 따라 조정 (8192~16384)
+    kv-cache-memory-bytes: "10G"     # GPU VRAM에 맞게 조정
+    max-num-seqs: 128
+    max-num-batched-tokens: 131072
+    limit-mm-per-prompt: '{"image": 1}'
+    seed: 0
+  startup:
+    timeout_seconds: 300
+    poll_interval_seconds: 5
+    stream_logs: true
+
+# ── 평가 설정 ──
+evaluate:
+  model: "{HuggingFace 모델 ID}"                                                                    # <-- 변경: docker.model과 동일
+  run_name: "{모델명}"                                                                               # <-- 변경: 결과 디렉토리명
+  api_base: "http://127.0.0.1:8000/v1"                                                              # <-- 고정값
+  bench_base_path: "/mnt/PoC_benchmark/huggingface_benchmarks_dataset/Leaderboard_bench"             # <-- 고정값
+  output_path: "/home/gpuadmin/Repo/seoik/train_eval_toolkit/results/vllm_eval"
+  overwrite_results: false           # true=항상 덮어쓰기, false=기존 CSV 존재+row수 일치 시 스킵
+
+  # ── 벤치마크 목록 ──
+  # Falldown (13개) 또는 Fire (6개) 중 택 1. 아래는 Fire 기준.
+  # Falldown 평가 시 하단의 Falldown 목록으로 교체하세요.
+  benchmarks:                        # <-- 변경 (카테고리에 맞게 선택)
+    # -- Fire 벤치마크 (6개) --
+    - "PIA_Fire"
+    - "SamsungCNT_Fire"
+    - "Soil_Fire"
+    - "Hyundai_Fire"
+    - "Coupang_Fire"
+    - "Kumho_Fire"
+    # -- Falldown 벤치마크 (13개) --
+    # - "ABB_Falldown"
+    # - "Coupang_Falldown"
+    # - "DTRO_Falldown"
+    # - "GangNam_Falldown"
+    # - "Hyundai_Falldown"
+    # - "Innodep_Falldown"
+    # - "KhonKaen_Falldown"
+    # - "KISA_Falldown"
+    # - "Kumho_Falldown"
+    # - "PIA_Falldown"
+    # - "Soil_Falldown"
+    # - "UGO_Falldown"
+    # - "Yonsei_Falldown"
+
+  # 프레임 샘플링 (Fire: 15, Falldown: 30)
+  window_size: 15                    # <-- 변경 (카테고리에 맞게)
+  interpolation: "forward"
+
+  # 추론 파라미터
+  concurrency: 10
+  jpeg_quality: 95
+  max_tokens: 15
+  temperature: 0.0
+  seed: 0
+  negative_label: "normal"
+
+  # 카테고리별 프롬프트
+  prompt_templates:
+    falldown: |
+      Analyze this image carefully. Determine if a person has fallen down.
+
+      Important classification rules:
+
+      - The "falldown" category applies to any person who is lying down, regardless of:
+        - the surface (e.g., floor, mattress, bed)
+        - the posture (natural or unnatural)
+        - the cause (e.g., sleeping, collapsing, lying intentionally)
+      - This includes:
+        - A person lying flat on the ground or other surfaces
+        - A person collapsed or sprawled in any lying position
+      - The "normal" category applies only if the person is:
+        - sitting
+        - standing
+        - kneeling
+        - or otherwise upright (not lying down)
+
+      Answer in JSON format with BOTH of the following fields:
+      - "category": either "falldown" or "normal"
+      - "description": a brief reason why this classification was made (e.g., "person lying on a mattress", "person sitting on sofa")
+
+      Example:
+      {
+        "category": "falldown",
+        "description": "person lying on a mattress in natural posture"
+      }
+
+    fire: |
+      Analyze this image carefully. Only classify it as "fire" if there are ACTUAL FLAMES or ACTIVE FIRE visible in the image.
+
+      Important classification rules:
+
+      - The "fire" category applies ONLY to images with:
+       - visible flames or burning fire
+       - active combustion or blazing materials
+       - actual fire sources (e.g., campfire, house fire, candle flame, burning car, torch flame)
+      - This includes:
+       - Real flames from any source
+       - Active burning or combustion
+       - Visible fire with smoke and flames
+       - Burning vehicles or cars on fire
+       - Torches, flamethrowers, or similar devices with visible flames
+      - The "normal" category applies to:
+       - Fire-related objects WITHOUT actual flames (fire trucks, fire extinguishers, fire hydrants)
+       - Red colors, sunset glows, red lights, or the sun
+       - Fire emojis or cartoon representations of fire
+       - Text or words containing "fire" (signs, labels, written text)
+       - Any image without visible flames or active fire
+       - welding sparks, grinding sparks, cutting sparks, or metal sparks without visible flames
+       - glowing metal fragments, hot particles, or red/orange sparks from construction tools
+       - brief spark showers from machinery that do not show sustained flames or active burning
+
+      Answer in JSON format with BOTH of the following fields:
+      - "category": either "fire" or "normal"
+      - "description": a brief reason why this classification was made (e.g., "visible flames from campfire", "fire truck without flames")
+
+      Example:
+      {
+        "category": "fire",
+        "description": "visible flames from burning building"
+      }
+
+    smoke: "Is {category} visible in this image? Answer only with 0 (no) or 1 (yes)."
+    violence: "Is {category} visible in this image? Answer only with 0 (no) or 1 (yes)."
+    sittingdown: "Is {category} visible in this image? Answer only with 0 (no) or 1 (yes)."
+    smoking: "Is {category} visible in this image? Answer only with 0 (no) or 1 (yes)."
+    default: "Is {category} visible in this image? Answer only with 0 (no) or 1 (yes)."
+
+# ── 제출 설정 ──
+submit:
+  gradio_url: "http://172.168.47.39:7860/"               # <-- 고정값
+  model_name: "{모델명}"                                  # <-- 변경: 리더보드 표시 모델명
+  task_name: "🌠 VLM 🖥️"
+  datasets_used: "Pretrained"                             # <-- 변경: "Finetuned" 또는 "Pretrained"
+  config_file: "config.json"
+  results_base_dir: "results/vllm_eval"
+  interval_seconds: 60
