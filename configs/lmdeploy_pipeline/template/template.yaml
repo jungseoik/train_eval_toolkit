@@ -1,18 +1,24 @@
 # ============================================================
-# vLLM 벤치마크 평가 파이프라인 설정
+# LMDeploy 벤치마크 평가 파이프라인 설정 - 템플릿
 #
-# Qwen3.5-2B 베이스 모델의 Fire 벤치마크 테스트용.
-# (테스트셋 평가 Precision/Recall/F1 과는 별개 프로세스)
+# 이 파일을 복사한 뒤 "<-- 변경" 표시된 필드만 수정하세요.
+# "<-- 고정값" 표시된 필드는 서버 환경에 종속된 값이므로 변경하지 마세요.
 #
 # 사용법:
-#   python -m src.vllm_pipeline -c configs/vllm_pipeline/qwen35_2b_fire.yaml
+#   1. cp configs/lmdeploy_pipeline/template/template.yaml configs/lmdeploy_pipeline/{모델명}_{카테고리}.yaml
+#   2. "<-- 변경" 필드 수정
+#   3. python -m src.lmdeploy_pipeline -c configs/lmdeploy_pipeline/{모델명}_{카테고리}.yaml
+#      또는 API로 전송: curl -N -F 'file=@{모델명}_{카테고리}.yaml' http://172.168.43.214:9000/pipeline/run/file
 #
 # 모델 교체 시 변경 필드:
-#   docker.model, evaluate.model, evaluate.run_name, submit.model_name
+#   docker.model_path, docker.hf_repo_id, docker.container_name,
+#   evaluate.run_name, submit.model_name
+#
+# 상세 가이드: docs/eval/lmdeploy_yaml_guide.md
 # ============================================================
 
 pipeline:
-  name: "Qwen3.5-2B Fire Benchmark"
+  name: "{모델명} {카테고리} Benchmark (LMDeploy)"     # <-- 변경
   steps:
     docker: true
     evaluate: true
@@ -23,48 +29,64 @@ retry:
   max_attempts: 3
   wait_seconds: 30
 
-# ── Docker 설정 ──
+# -- Docker 설정 --
 docker:
-  container_name: "qwen35_2b_mm_80g"
-  image: "vllm/vllm-openai:cu130-nightly"
+  container_name: "{모델명}_lmdeploy"                   # <-- 변경: 고유한 컨테이너 이름
+  image: "openmmlab/lmdeploy:latest-cu12"                # <-- 고정값
+  model_path: "ckpts/{모델명}"                           # <-- 변경: 로컬 모델 경로
+  hf_repo_id: ""                                         # <-- 변경: (선택) HuggingFace repo ID. 로컬에 모델 없으면 자동 다운로드
+  container_model_path: "/model"                         # <-- 고정값
   gpus: "all"
-  port: 8000
+  port: 23333
   ipc: "host"
-  volumes:
-    - "~/.cache/huggingface:/root/.cache/huggingface"
-  model: "Qwen/Qwen3.5-2B"
-  vllm_args:
-    tensor-parallel-size: 1
-    max-model-len: 8192
-    kv-cache-memory-bytes: "10G"
-    max-num-seqs: 128
-    max-num-batched-tokens: 131072
-    limit-mm-per-prompt: '{"image": 1}'
-    seed: 0
+  volumes: []
+  lmdeploy_args:
+    tp: 1                          # GPU 텐서 병렬 수
+    session-len: 8192              # KV cache 최대 시퀀스 길이
+    backend: "pytorch"             # 추론 백엔드
+    cache-max-entry-count: 0.8     # KV cache GPU 메모리 비율 (0.0~1.0)
   startup:
     timeout_seconds: 300
     poll_interval_seconds: 5
     stream_logs: true
 
-# ── 평가 설정 ──
+# -- 평가 설정 --
 evaluate:
-  model: "Qwen/Qwen3.5-2B"
-  run_name: "Qwen3_5-2B"
-  api_base: "http://127.0.0.1:8000/v1"
-  bench_base_path: "/mnt/PoC_benchmark/huggingface_benchmarks_dataset/Leaderboard_bench"
-  output_path: "/home/gpuadmin/Repo/seoik/train_eval_toolkit/results/vllm_eval"
-  overwrite_results: false
+  model: "/model"                                                                                    # <-- 고정값
+  run_name: "{모델명}"                                                                               # <-- 변경: 결과 디렉토리명
+  api_base: "http://127.0.0.1:23333/v1"                                                             # <-- 고정값
+  bench_base_path: "/mnt/PoC_benchmark/huggingface_benchmarks_dataset/Leaderboard_bench"             # <-- 고정값
+  output_path: "results/lmdeploy_eval"
+  overwrite_results: false           # true=항상 덮어쓰기, false=기존 CSV 존재+row수 일치 시 스킵
 
-  benchmarks:
-    - "PIA_Fire"
-    - "SamsungCNT_Fire"
-    - "Soil_Fire"
-    - "Hyundai_Fire"
-    - "Coupang_Fire"
-    - "Kumho_Fire"
+  # ── 벤치마크 목록 ──
+  # Falldown (13개) 또는 Fire (6개) 중 택 1. 아래는 Falldown 기준.
+  # Fire 평가 시 하단의 Fire 목록으로 교체하세요.
+  benchmarks:                        # <-- 변경 (카테고리에 맞게 선택)
+    # -- Falldown 벤치마크 (13개) --
+    - "ABB_Falldown"
+    - "Coupang_Falldown"
+    - "DTRO_Falldown"
+    - "GangNam_Falldown"
+    - "Hyundai_Falldown"
+    - "Innodep_Falldown"
+    - "KhonKaen_Falldown"
+    - "KISA_Falldown"
+    - "Kumho_Falldown"
+    - "PIA_Falldown"
+    - "Soil_Falldown"
+    - "UGO_Falldown"
+    - "Yonsei_Falldown"
+    # -- Fire 벤치마크 (6개) --
+    # - "PIA_Fire"
+    # - "SamsungCNT_Fire"
+    # - "Soil_Fire"
+    # - "Hyundai_Fire"
+    # - "Coupang_Fire"
+    # - "Kumho_Fire"
 
-  # 프레임 샘플링
-  window_size: 15
+  # 프레임 샘플링 (Falldown: 30, Fire: 15)
+  window_size: 30                    # <-- 변경 (카테고리에 맞게)
   interpolation: "forward"
 
   # 추론 파라미터
@@ -140,18 +162,14 @@ evaluate:
         "description": "visible flames from burning building"
       }
 
-    smoke: "Is {category} visible in this image? Answer only with 0 (no) or 1 (yes)."
-    violence: "Is {category} visible in this image? Answer only with 0 (no) or 1 (yes)."
-    sittingdown: "Is {category} visible in this image? Answer only with 0 (no) or 1 (yes)."
-    smoking: "Is {category} visible in this image? Answer only with 0 (no) or 1 (yes)."
     default: "Is {category} visible in this image? Answer only with 0 (no) or 1 (yes)."
 
-# ── 제출 설정 ──
+# -- 제출 설정 --
 submit:
-  gradio_url: "http://172.168.47.39:7860/"
-  model_name: "Qwen3_5-2B"
+  gradio_url: "http://172.168.47.39:7860/"               # <-- 고정값
+  model_name: "{모델명}"                                  # <-- 변경: 리더보드 표시 모델명
   task_name: "🌠 VLM 🖥️"
-  datasets_used: "Pretrained"
+  datasets_used: "Finetuned"                              # <-- 변경: "Finetuned" 또는 "Pretrained"
   config_file: "config.json"
-  results_base_dir: "results/vllm_eval"
+  results_base_dir: "results/lmdeploy_eval"
   interval_seconds: 60

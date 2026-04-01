@@ -1,18 +1,13 @@
 """
-lmdeploy_bench_eval.py
+vllm_bench_eval.py
 
-LMDeploy 서버를 이용한 프레임 단위 벤치마크 평가 모듈.
-파인튜닝 완료된 InternVL3 계열 로컬 모델의 최종 벤치마크 평가 전용.
-(테스트셋 평가 Precision/Recall/F1 과는 별개 프로세스)
-
-LMDeploy는 OpenAI 호환 API(/v1/chat/completions)를 제공하므로
-vllm_bench_eval.py와 동일한 추론 로직을 사용.
+vLLM 서버를 이용한 프레임 단위 벤치마크 평가 모듈.
 
 사용법:
-    python src/evaluation/lmdeploy_bench_eval.py --config configs/lmdeploy_eval/config.py
+    python src/evaluation/vllm_bench_eval.py --config configs/vllm_eval/config.py
 
     # 특정 벤치마크만 평가
-    python src/evaluation/lmdeploy_bench_eval.py --config configs/lmdeploy_eval/config.py \
+    python src/evaluation/vllm_bench_eval.py --config configs/vllm_eval/config.py \
         --benchmarks Innodep_Falldown KhonKaen_Smoke
 """
 
@@ -34,6 +29,19 @@ import cv2
 import httpx
 
 
+class InferenceAbortError(RuntimeError):
+    """추론 재시도 실패 시 발생. 중단 지점 정보를 포함."""
+
+    def __init__(self, bench: str, video: str, frame: int, cause: Exception):
+        self.bench = bench
+        self.video = video
+        self.frame = frame
+        self.cause = cause
+        super().__init__(
+            f"Inference aborted: bench={bench}, video={video}, frame={frame} — {cause}"
+        )
+
+
 # ============================================================
 # 설정 로딩
 # ============================================================
@@ -43,7 +51,7 @@ def load_config(config_path: str) -> ModuleType:
     path = Path(config_path)
     if not path.exists():
         raise FileNotFoundError(f"Config not found: {path}")
-    spec = importlib.util.spec_from_file_location("lmdeploy_eval_config", path)
+    spec = importlib.util.spec_from_file_location("vllm_eval_config", path)
     cfg = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(cfg)
     return cfg
@@ -54,7 +62,7 @@ def load_config(config_path: str) -> ModuleType:
 # ============================================================
 
 def get_category_from_bench(bench_name: str) -> str:
-    """벤치마크 폴더명에서 카테고리 추출. 예: Innodep_Falldown -> falldown"""
+    """벤치마크 폴더명에서 카테고리 추출. 예: Innodep_Falldown → falldown"""
     parts = bench_name.split("_")
     return parts[-1].lower() if len(parts) >= 2 else bench_name.lower()
 
@@ -108,7 +116,7 @@ def _extract_frame_jpeg_sync(video_path: Path, frame_idx: int, jpeg_quality: int
 
 
 # ============================================================
-# LMDeploy 추론 (OpenAI 호환 API)
+# vLLM 추론
 # ============================================================
 
 async def _infer_frame(
@@ -121,7 +129,7 @@ async def _infer_frame(
     temperature: float,
     seed: int,
 ) -> str:
-    """이미지 1장을 LMDeploy 서버로 보내고 응답 텍스트를 반환."""
+    """이미지 1장을 vLLM 서버로 보내고 응답 텍스트를 반환."""
     payload = {
         "model": model,
         "messages": [
@@ -148,7 +156,7 @@ async def _infer_frame(
 
 # ============================================================
 # 파서
-# 두 단계로 분리: parse_model_output -> classify
+# 두 단계로 분리: parse_model_output → classify
 # ============================================================
 
 def parse_model_output(raw_text: str, valid_values: list[str]) -> str:
@@ -185,7 +193,7 @@ def parse_model_output(raw_text: str, valid_values: list[str]) -> str:
             except json.JSONDecodeError:
                 pass
 
-        # 3단계: 정규식 fallback -- "category": "value" 패턴 직접 탐색
+        # 3단계: 정규식 fallback — "category": "value" 패턴 직접 탐색
         pattern = r'["\']category["\']\s*:\s*["\'](' + "|".join(re.escape(v) for v in valid_values) + r')["\']'
         m = re.search(pattern, clean)
         if m:
@@ -218,10 +226,7 @@ async def _evaluate_video_async(
     valid_values: list[str],
     cfg: ModuleType,
     video_label: str,
-    progress_state: dict | None = None,
-    bench_idx: int | None = None,
-    video_done: int = 0,
-    video_total: int = 0,
+    bench_name: str = "",
 ) -> dict[int, int]:
     """
     비디오 1개를 프레임 단위로 추론.
@@ -272,33 +277,46 @@ async def _evaluate_video_async(
                 )
                 pred = classify(parse_model_output(raw_text, valid_values), category)
             except Exception as exc:
-                warnings.warn(f"Inference failed for {video_path.name} frame={fidx}: {exc}")
-                pred = 0
+                warnings.warn(f"Inference failed for {video_path.name} frame={fidx}: {exc}, retrying...")
+                # 1회 재시도
+                try:
+                    raw_text = await _infer_frame(
+                        client, api_url,
+                        cfg.MODEL, b64, prompt,
+                        cfg.MAX_TOKENS, cfg.TEMPERATURE, cfg.SEED,
+                    )
+                    pred = classify(parse_model_output(raw_text, valid_values), category)
+                except Exception as retry_exc:
+                    raise InferenceAbortError(
+                        bench=bench_name,
+                        video=video_path.name,
+                        frame=fidx,
+                        cause=retry_exc,
+                    )
         return fidx, pred
 
     async with httpx.AsyncClient(limits=limits, timeout=300.0) as client:
         tasks = [asyncio.create_task(process_frame(fidx)) for fidx in sampled_frames]
         done = 0
-        for coro in asyncio.as_completed(tasks):
-            fidx, pred = await coro
-            sampled_preds[fidx] = pred
-            done += 1
-            print(
-                f"    {video_label}  frame {fidx:5d}/{total_frames-1}"
-                f"  pred={pred}  [{done}/{len(sampled_frames)}]",
-                end="\r",
-            )
-            if done % 10 == 0 or done == len(sampled_frames):
-                _update_video_progress(
-                    progress_state, bench_idx,
-                    video_done, video_total,
-                    frame_done=done, frame_total=len(sampled_frames),
+        try:
+            for coro in asyncio.as_completed(tasks):
+                fidx, pred = await coro
+                sampled_preds[fidx] = pred
+                done += 1
+                print(
+                    f"    {video_label}  frame {fidx:5d}/{total_frames-1}"
+                    f"  pred={pred}  [{done}/{len(sampled_frames)}]",
+                    end="\r",
                 )
+        except InferenceAbortError:
+            for t in tasks:
+                t.cancel()
+            raise
 
     print()
 
     # --------------------------------------------------------
-    # 인터폴레이션 -> 전체 프레임 예측값 생성
+    # 인터폴레이션 → 전체 프레임 예측값 생성
     # --------------------------------------------------------
     all_preds: dict[int, int] = {}
     sorted_sampled = sorted(sampled_preds.keys())
@@ -326,48 +344,13 @@ async def _evaluate_video_async(
 
 
 # ============================================================
-# 예외
-# ============================================================
-
-
-class BenchmarkSkipError(RuntimeError):
-    """벤치마크 경로/데이터 문제로 스킵해야 할 때 발생."""
-
-    def __init__(self, bench_name: str, reason: str):
-        self.bench_name = bench_name
-        self.reason = reason
-        super().__init__(f"[{bench_name}] {reason}")
-
-
-# ============================================================
 # 단일 벤치마크 평가
 # ============================================================
 
-def _update_video_progress(
-    state: dict | None, bench_idx: int | None,
-    video_done: int, video_total: int,
-    frame_done: int = 0, frame_total: int = 0,
-) -> None:
-    """progress_state의 현재 벤치마크에 영상/프레임 진행도를 기록한다."""
-    if state is None or bench_idx is None or state.get("progress") is None:
-        return
-    entry = state["progress"]["benchmarks"][bench_idx]
-    entry["video"] = f"{video_done}/{video_total}"
-    if frame_total > 0:
-        entry["frame"] = f"{frame_done}/{frame_total}"
-    elif "frame" in entry:
-        del entry["frame"]
-
-
-def evaluate_benchmark(
-    bench_name: str,
-    cfg: ModuleType,
-    progress_state: dict | None = None,
-    bench_idx: int | None = None,
-) -> None:
+def evaluate_benchmark(bench_name: str, cfg: ModuleType) -> None:
     """
     벤치마크 1개의 모든 비디오를 순차 평가하고
-    {OUTPUT_PATH}/{RUN_NAME}/{BenchmarkName}/{video_stem}.csv 에 결과를 저장.
+    {OUTPUT_PATH}/{bench_name}/{video_stem}.csv 에 결과를 저장.
 
     CSV 포맷:
         frame,{category}
@@ -378,7 +361,8 @@ def evaluate_benchmark(
     """
     bench_path = Path(cfg.BENCH_BASE_PATH) / bench_name
     if not bench_path.exists():
-        raise BenchmarkSkipError(bench_name, f"Benchmark path not found: {bench_path}")
+        print(f"[SKIP] Benchmark path not found: {bench_path}")
+        return
 
     category = get_category_from_bench(bench_name)
 
@@ -391,13 +375,12 @@ def evaluate_benchmark(
     try:
         pairs = find_video_gt_pairs(bench_path, category)
     except FileNotFoundError as exc:
-        raise BenchmarkSkipError(bench_name, str(exc)) from exc
+        print(f"[ERROR] {exc}")
+        return
 
     if not pairs:
-        raise BenchmarkSkipError(
-            bench_name,
-            f"No (mp4, csv) pairs found in {bench_path}/dataset/{category}",
-        )
+        print("[SKIP] No (mp4, csv) pairs found.")
+        return
 
     print(f"Videos    : {len(pairs)}")
 
@@ -410,7 +393,6 @@ def evaluate_benchmark(
     overwrite = getattr(cfg, "OVERWRITE_RESULTS", True)
     skipped = 0
 
-    video_done = 0
     for i, (video_path, gt_csv_path) in enumerate(pairs):
         label = f"[{i+1}/{len(pairs)}] {video_path.name[:50]:<50}"
 
@@ -421,8 +403,6 @@ def evaluate_benchmark(
                 actual_rows = sum(1 for _ in open(output_csv, encoding="utf-8"))
                 if actual_rows == expected_rows:
                     skipped += 1
-                    video_done += 1
-                    _update_video_progress(progress_state, bench_idx, video_done, len(pairs))
                     continue
                 print(f"\n  {label}")
                 print(f"  [MISMATCH] expected={expected_rows} actual={actual_rows} -> re-evaluate")
@@ -431,21 +411,19 @@ def evaluate_benchmark(
         else:
             print(f"\n  {label}")
 
-        _update_video_progress(progress_state, bench_idx, video_done, len(pairs))
         t_start = time.perf_counter()
 
         try:
             all_preds = asyncio.run(
                 _evaluate_video_async(
-                    video_path, gt_csv_path, category, valid_values, cfg, label,
-                    progress_state=progress_state, bench_idx=bench_idx,
-                    video_done=video_done, video_total=len(pairs),
+                    video_path, gt_csv_path, category, valid_values,
+                    cfg, label, bench_name=bench_name,
                 )
             )
+        except InferenceAbortError:
+            raise
         except Exception as exc:
             print(f"  [ERROR] {exc}")
-            video_done += 1
-            _update_video_progress(progress_state, bench_idx, video_done, len(pairs))
             continue
 
         elapsed = time.perf_counter() - t_start
@@ -460,13 +438,11 @@ def evaluate_benchmark(
             for frame_idx in range(total_frames):
                 writer.writerow([frame_idx, all_preds.get(frame_idx, 0)])
 
-        print(f"  Saved -> {output_csv}")
-        video_done += 1
-        _update_video_progress(progress_state, bench_idx, video_done, len(pairs))
+        print(f"  Saved → {output_csv}")
 
     if skipped:
         print(f"\n  Skipped {skipped}/{len(pairs)} (existing results with matching rows)")
-    print(f"\n  Output dir -> {output_dir}")
+    print(f"\n  Output dir → {output_dir}")
 
 
 # ============================================================
@@ -490,11 +466,11 @@ def _resolve_config_path(raw: str) -> Path:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="LMDeploy 서버를 이용한 프레임 단위 벤치마크 평가"
+        description="vLLM 서버를 이용한 프레임 단위 벤치마크 평가"
     )
     parser.add_argument(
         "--config",
-        default="configs/lmdeploy_eval/config.py",
+        default="configs/vllm_eval/config.py",
         help="config.py 경로 (절대 또는 레포 루트 기준 상대경로)",
     )
     parser.add_argument(
@@ -515,7 +491,7 @@ def main() -> None:
     benchmarks: list[str] = args.benchmarks or cfg.BENCHMARKS
 
     print("=" * 60)
-    print("LMDeploy Benchmark Evaluation")
+    print("vLLM Benchmark Evaluation")
     print("=" * 60)
     print(f"Config      : {config_path}")
     print(f"API         : {cfg.API_BASE}  model={cfg.MODEL}")

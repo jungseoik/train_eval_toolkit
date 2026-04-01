@@ -36,7 +36,7 @@ docker:
   vllm_args:
     tensor-parallel-size: 1
     max-model-len: 8192
-    kv-cache-memory-bytes: "70G"
+    kv-cache-memory-bytes: "10G"
     max-num-seqs: 128
     max-num-batched-tokens: 131072
     limit-mm-per-prompt: '{"image": 1}'

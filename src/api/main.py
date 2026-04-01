@@ -19,7 +19,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
-from .pipeline_worker import run_pipeline_sse, validate_yaml
+from .pipeline_worker import run_pipeline_sse, validate_paths, validate_yaml
 
 GPU_VRAM_THRESHOLD_MB = 50_000  # 50GB
 
@@ -73,9 +73,11 @@ _state: dict = {
     "pipeline_name": None,
     "started_at": None,
     "finished_at": None,
+    "elapsed": None,
     "error": None,
     "hint": None,
     "result": None,
+    "progress": None,
 }
 
 
@@ -85,9 +87,11 @@ def _reset_state() -> None:
         "pipeline_name": None,
         "started_at": None,
         "finished_at": None,
+        "elapsed": None,
         "error": None,
         "hint": None,
         "result": None,
+        "progress": None,
     })
 
 
@@ -136,6 +140,17 @@ async def run_from_file(file: UploadFile = File(...)):
             "hint": "YAML 형식을 확인해주세요. 작성 가이드: docs/eval/lmdeploy_yaml_guide.md",
         })
 
+    # 경로 검증 (bench_base_path, 벤치마크 폴더 존재 여부)
+    paths_ok, paths_error = validate_paths(result)
+    if not paths_ok:
+        _lock.release()
+        raise HTTPException(status_code=400, detail={
+            "status": "validation_error",
+            "message": paths_error,
+            "hint": "bench_base_path 및 벤치마크 폴더 경로를 확인해주세요. "
+                    "서버 기준 경로: /mnt/PoC_benchmark/huggingface_benchmarks_dataset/Leaderboard_bench",
+        })
+
     # GPU VRAM 체크
     gpu_ok, gpu_msg = check_gpu_vram()
     if not gpu_ok:
@@ -176,6 +191,17 @@ async def run_from_yaml(body: YamlRequest):
             "status": "error",
             "message": result,
             "hint": "YAML 형식을 확인해주세요. 작성 가이드: docs/eval/lmdeploy_yaml_guide.md",
+        })
+
+    # 경로 검증 (bench_base_path, 벤치마크 폴더 존재 여부)
+    paths_ok, paths_error = validate_paths(result)
+    if not paths_ok:
+        _lock.release()
+        raise HTTPException(status_code=400, detail={
+            "status": "validation_error",
+            "message": paths_error,
+            "hint": "bench_base_path 및 벤치마크 폴더 경로를 확인해주세요. "
+                    "서버 기준 경로: /mnt/PoC_benchmark/huggingface_benchmarks_dataset/Leaderboard_bench",
         })
 
     # GPU VRAM 체크

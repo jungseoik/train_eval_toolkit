@@ -9,11 +9,12 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import subprocess
-import tempfile
 import threading
 import time
 import os
+from pathlib import Path
 from typing import AsyncGenerator
 
 import yaml
@@ -59,12 +60,60 @@ def validate_yaml(yaml_content: str) -> tuple[bool, str | dict]:
     return True, config
 
 
-def save_yaml_to_temp(yaml_content: str) -> str:
-    """YAML 문자열을 임시 파일로 저장하고 경로를 반환한다."""
-    fd, path = tempfile.mkstemp(suffix=".yaml", prefix="pipeline_")
-    with os.fdopen(fd, "w") as f:
-        f.write(yaml_content)
-    return path
+UPLOADED_YAML_DIR = Path(__file__).resolve().parent.parent.parent / "results" / "api" / "uploaded_yamls"
+
+
+def save_yaml_permanent(yaml_content: str, pipeline_name: str = "unknown") -> str:
+    """YAML을 영구 저장 디렉토리에 저장하고 경로를 반환한다."""
+    UPLOADED_YAML_DIR.mkdir(parents=True, exist_ok=True)
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    safe_name = re.sub(r"[^\w\-]", "_", pipeline_name)[:80]
+    filename = f"{timestamp}_{safe_name}.yaml"
+    path = UPLOADED_YAML_DIR / filename
+    path.write_text(yaml_content, encoding="utf-8")
+    return str(path)
+
+
+def validate_paths(config: dict) -> tuple[bool, str | None]:
+    """YAML 설정의 파일시스템 경로를 검증한다.
+
+    Returns:
+        (True, None) 또는 (False, error_message)
+    """
+    errors: list[str] = []
+    evaluate = config.get("evaluate", {})
+
+    # 1) bench_base_path 존재 여부
+    bench_base = evaluate.get("bench_base_path", "")
+    if not bench_base:
+        errors.append("evaluate.bench_base_path가 지정되지 않았습니다.")
+    elif not Path(bench_base).exists():
+        errors.append(f"bench_base_path가 존재하지 않습니다: {bench_base}")
+
+    # 2) benchmarks 리스트 비어있는지
+    benchmarks = evaluate.get("benchmarks", [])
+    if not benchmarks:
+        errors.append("evaluate.benchmarks가 비어 있습니다.")
+
+    # 3) 각 벤치마크 폴더 존재 여부 (bench_base가 존재할 때만)
+    if bench_base and Path(bench_base).exists() and benchmarks:
+        missing = [b for b in benchmarks if not (Path(bench_base) / b).exists()]
+        if missing:
+            errors.append(
+                f"벤치마크 폴더를 찾을 수 없습니다 ({len(missing)}/{len(benchmarks)}개): "
+                f"{', '.join(missing)}"
+            )
+
+    # 4) output_path 쓰기 가능 여부
+    output_path = evaluate.get("output_path", "")
+    if output_path:
+        out = Path(output_path)
+        if out.exists() and not os.access(str(out), os.W_OK):
+            errors.append(f"output_path에 쓰기 권한이 없습니다: {output_path}")
+
+    if errors:
+        return False, "\n".join(errors)
+    return True, None
 
 
 def _get_error_hint(error: Exception) -> str:
@@ -92,6 +141,7 @@ def _background_eval_submit_cleanup(
         # 평가
         eval_result = run_evaluation(
             cfg.evaluate, cfg.retry_max_attempts, cfg.retry_wait_seconds,
+            progress_state=state,
         )
         eval_success = eval_result["success"]
 
@@ -107,11 +157,27 @@ def _background_eval_submit_cleanup(
 
         n_success = len(eval_result["success"])
         n_failed = len(eval_result["failed"])
-        state["status"] = "completed"
-        state["result"] = f"평가 완료: {n_success}/{n_success + n_failed} 벤치마크 성공"
-        if eval_result["failed"]:
+        n_total = n_success + n_failed
+
+        if n_success == 0 and n_total > 0:
+            # 전부 실패
+            state["status"] = "failed"
             failed_names = [f["benchmark"] for f in eval_result["failed"]]
-            state["result"] += f", 실패: {', '.join(failed_names)}"
+            first_error = eval_result["failed"][0].get("error", "unknown")
+            state["error"] = f"모든 벤치마크({n_total}개)가 실패했습니다: {', '.join(failed_names)}"
+            state["hint"] = f"첫 번째 에러: {first_error}"
+        elif n_failed > 0:
+            # 일부 실패
+            state["status"] = "completed"
+            failed_names = [f["benchmark"] for f in eval_result["failed"]]
+            state["result"] = (
+                f"평가 완료: {n_success}/{n_total} 벤치마크 성공, "
+                f"실패: {', '.join(failed_names)}"
+            )
+        else:
+            # 전부 성공
+            state["status"] = "completed"
+            state["result"] = f"평가 완료: {n_success}/{n_total} 벤치마크 성공"
 
     except Exception as e:
         state["status"] = "failed"
@@ -129,13 +195,25 @@ def _background_eval_submit_cleanup(
             except Exception:
                 pass
 
-        # 임시 파일 삭제
-        try:
-            os.remove(yaml_path)
-        except OSError:
-            pass
-
         state["finished_at"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+
+        # 총 소요 시간 계산
+        if state.get("started_at"):
+            try:
+                t0 = time.strptime(state["started_at"], "%Y-%m-%dT%H:%M:%S")
+                t1 = time.strptime(state["finished_at"], "%Y-%m-%dT%H:%M:%S")
+                elapsed = int(time.mktime(t1) - time.mktime(t0))
+                m, s = divmod(elapsed, 60)
+                h, m = divmod(m, 60)
+                if h > 0:
+                    state["elapsed"] = f"{h}시간 {m}분 {s}초"
+                elif m > 0:
+                    state["elapsed"] = f"{m}분 {s}초"
+                else:
+                    state["elapsed"] = f"{s}초"
+            except Exception:
+                pass
+
         lock.release()
 
 
@@ -148,9 +226,13 @@ async def run_pipeline_sse(
 
     Docker 준비 → 벤치마크 시작 확인까지 SSE 스트리밍.
     이후 평가/제출/cleanup은 백그라운드 스레드에서 진행.
+
+    클라이언트 연결 끊김(GeneratorExit) 등 어떤 상황에서도
+    lock 해제를 보장하기 위해 background_started 플래그를 사용한다.
     """
     loop = asyncio.get_event_loop()
     yaml_path = None
+    background_started = False  # 백그라운드 스레드가 lock 책임을 인계받았는지
 
     try:
         # 1. YAML 검증
@@ -158,19 +240,17 @@ async def run_pipeline_sse(
         valid, result = validate_yaml(yaml_content)
         if not valid:
             yield sse_event("error", result, hint="YAML 형식을 확인해주세요. 작성 가이드: docs/eval/lmdeploy_yaml_guide.md")
-            lock.release()
             return
 
         yield sse_event("yaml_validated", "YAML 검증 완료")
 
-        # 2. 임시 파일 저장 + config 로드
-        yaml_path = save_yaml_to_temp(yaml_content)
+        # 2. YAML 영구 저장 + config 로드
+        pipeline_name_raw = result.get("pipeline", {}).get("name", "unknown")
+        yaml_path = save_yaml_permanent(yaml_content, pipeline_name_raw)
         try:
             cfg = await loop.run_in_executor(None, load_pipeline_config, yaml_path)
         except Exception as e:
             yield sse_event("error", f"설정 로드 실패: {e}", hint="YAML 필드를 확인해주세요.")
-            lock.release()
-            _safe_remove(yaml_path)
             return
 
         pipeline_name = cfg.name
@@ -187,8 +267,6 @@ async def run_pipeline_sse(
             yield sse_event("model_ready", f"모델 준비 완료: {cfg.docker.model_path}")
         except (FileNotFoundError, RuntimeError) as e:
             yield sse_event("error", f"모델 에러: {e}", hint=_get_error_hint(e))
-            lock.release()
-            _safe_remove(yaml_path)
             return
 
         # 4. Docker 기동
@@ -203,8 +281,6 @@ async def run_pipeline_sse(
             await loop.run_in_executor(None, start_container, cfg.docker)
         except RuntimeError as e:
             yield sse_event("error", f"Docker 기동 실패: {e}", hint=_get_error_hint(e))
-            lock.release()
-            _safe_remove(yaml_path)
             return
 
         # 5. 서버 준비 대기
@@ -214,13 +290,10 @@ async def run_pipeline_sse(
             ready = await loop.run_in_executor(None, wait_for_ready, cfg.docker)
         except Exception as e:
             yield sse_event("error", f"서버 준비 실패: {e}", hint=_get_error_hint(e))
-            # cleanup container
             try:
                 await loop.run_in_executor(None, stop_container, cfg.docker.container_name)
             except Exception:
                 pass
-            lock.release()
-            _safe_remove(yaml_path)
             return
 
         if not ready:
@@ -229,38 +302,44 @@ async def run_pipeline_sse(
                 await loop.run_in_executor(None, stop_container, cfg.docker.container_name)
             except Exception:
                 pass
-            lock.release()
-            _safe_remove(yaml_path)
             return
 
         docker_elapsed = time.time() - docker_start
         yield sse_event("docker_ready", f"컨테이너 준비 완료 ({docker_elapsed:.1f}s)")
 
-        # 6. 벤치마크 시작 알림
+        # 6. 벤치마크 시작 알림 + progress 초기화
         benchmarks = cfg.evaluate.benchmarks or []
+        state["progress"] = {
+            "total": len(benchmarks),
+            "completed": 0,
+            "current": None,
+            "benchmarks": [
+                {"name": b, "status": "pending"} for b in benchmarks
+            ],
+        }
         yield sse_event("eval_started", f"벤치마크 평가 시작 ({len(benchmarks)}개). 리더보드에서 결과를 확인하세요.")
         yield sse_event("done", "평가가 시작되었습니다. 추후 벤치마크 결과를 리더보드에서 확인해보세요.")
 
         # 7. 백그라운드 스레드에서 평가 + 제출 + cleanup
+        #    이 시점부터 lock 해제 책임은 백그라운드 스레드로 이관
         state["status"] = "evaluating"
+        background_started = True
         thread = threading.Thread(
             target=_background_eval_submit_cleanup,
             args=(cfg, state, lock, yaml_path),
-            daemon=True,
+            daemon=False,
         )
         thread.start()
-        # yaml_path는 백그라운드에서 삭제하므로 여기서는 건드리지 않음
 
+    except GeneratorExit:
+        # 클라이언트가 SSE 연결을 끊은 경우 (curl Ctrl+C 등)
+        pass
     except Exception as e:
         yield sse_event("error", f"예기치 않은 에러: {e}", hint=_get_error_hint(e))
-        if lock.locked():
-            lock.release()
-        if yaml_path:
-            _safe_remove(yaml_path)
-
-
-def _safe_remove(path: str) -> None:
-    try:
-        os.remove(path)
-    except OSError:
-        pass
+    finally:
+        # 백그라운드 스레드가 시작되지 않았으면 여기서 정리
+        if not background_started:
+            state["status"] = "idle"
+            state["finished_at"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+            if lock.locked():
+                lock.release()

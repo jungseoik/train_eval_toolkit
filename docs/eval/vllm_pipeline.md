@@ -11,7 +11,10 @@ Docker 컨테이너 실행, 벤치마크 평가, 결과 제출, 정리까지 이
 ## 빠른 시작
 
 ```bash
-# 전체 파이프라인 실행
+# 1. 기준 템플릿 복사 후 수정
+cp configs/vllm_pipeline/template/template.yaml configs/vllm_pipeline/{모델명}_{카테고리}.yaml
+
+# 2. 전체 파이프라인 실행
 conda activate llm
 python -m src.vllm_pipeline.cli -c configs/vllm_pipeline/qwen35_2b_fire.yaml
 

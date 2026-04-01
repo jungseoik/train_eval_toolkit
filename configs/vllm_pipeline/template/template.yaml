@@ -1,18 +1,22 @@
 # ============================================================
-# vLLM 벤치마크 평가 파이프라인 설정
+# vLLM 벤치마크 평가 파이프라인 설정 - 템플릿
 #
-# Qwen3.5-2B 베이스 모델의 Fire 벤치마크 테스트용.
-# (테스트셋 평가 Precision/Recall/F1 과는 별개 프로세스)
+# 이 파일을 복사한 뒤 "<-- 변경" 표시된 필드만 수정하세요.
+# "<-- 고정값" 표시된 필드는 서버 환경에 종속된 값이므로 변경하지 마세요.
 #
 # 사용법:
-#   python -m src.vllm_pipeline -c configs/vllm_pipeline/qwen35_2b_fire.yaml
+#   1. cp configs/vllm_pipeline/template/template.yaml configs/vllm_pipeline/{모델명}_{카테고리}.yaml
+#   2. "<-- 변경" 필드 수정
+#   3. python -m src.vllm_pipeline -c configs/vllm_pipeline/{모델명}_{카테고리}.yaml
 #
 # 모델 교체 시 변경 필드:
 #   docker.model, evaluate.model, evaluate.run_name, submit.model_name
+#
+# 상세 가이드: docs/eval/vllm_pipeline.md
 # ============================================================
 
 pipeline:
-  name: "Qwen3.5-2B Fire Benchmark"
+  name: "{모델명} {카테고리} Benchmark"                  # <-- 변경
   steps:
     docker: true
     evaluate: true
@@ -25,18 +29,18 @@ retry:
 
 # ── Docker 설정 ──
 docker:
-  container_name: "qwen35_2b_mm_80g"
-  image: "vllm/vllm-openai:cu130-nightly"
+  container_name: "{모델명}_vllm"                        # <-- 변경: 고유한 컨테이너 이름
+  image: "vllm/vllm-openai:cu130-nightly"                # <-- 고정값
   gpus: "all"
   port: 8000
   ipc: "host"
   volumes:
     - "~/.cache/huggingface:/root/.cache/huggingface"
-  model: "Qwen/Qwen3.5-2B"
+  model: "{HuggingFace 모델 ID}"                         # <-- 변경: 예) "Qwen/Qwen3.5-2B"
   vllm_args:
     tensor-parallel-size: 1
-    max-model-len: 8192
-    kv-cache-memory-bytes: "10G"
+    max-model-len: 8192              # 모델에 따라 조정 (8192~16384)
+    kv-cache-memory-bytes: "10G"     # GPU VRAM에 맞게 조정
     max-num-seqs: 128
     max-num-batched-tokens: 131072
     limit-mm-per-prompt: '{"image": 1}'
@@ -48,23 +52,41 @@ docker:
 
 # ── 평가 설정 ──
 evaluate:
-  model: "Qwen/Qwen3.5-2B"
-  run_name: "Qwen3_5-2B"
-  api_base: "http://127.0.0.1:8000/v1"
-  bench_base_path: "/mnt/PoC_benchmark/huggingface_benchmarks_dataset/Leaderboard_bench"
+  model: "{HuggingFace 모델 ID}"                                                                    # <-- 변경: docker.model과 동일
+  run_name: "{모델명}"                                                                               # <-- 변경: 결과 디렉토리명
+  api_base: "http://127.0.0.1:8000/v1"                                                              # <-- 고정값
+  bench_base_path: "/mnt/PoC_benchmark/huggingface_benchmarks_dataset/Leaderboard_bench"             # <-- 고정값
   output_path: "/home/gpuadmin/Repo/seoik/train_eval_toolkit/results/vllm_eval"
-  overwrite_results: false
+  overwrite_results: false           # true=항상 덮어쓰기, false=기존 CSV 존재+row수 일치 시 스킵
 
-  benchmarks:
+  # ── 벤치마크 목록 ──
+  # Falldown (13개) 또는 Fire (6개) 중 택 1. 아래는 Fire 기준.
+  # Falldown 평가 시 하단의 Falldown 목록으로 교체하세요.
+  benchmarks:                        # <-- 변경 (카테고리에 맞게 선택)
+    # -- Fire 벤치마크 (6개) --
     - "PIA_Fire"
     - "SamsungCNT_Fire"
     - "Soil_Fire"
     - "Hyundai_Fire"
     - "Coupang_Fire"
     - "Kumho_Fire"
+    # -- Falldown 벤치마크 (13개) --
+    # - "ABB_Falldown"
+    # - "Coupang_Falldown"
+    # - "DTRO_Falldown"
+    # - "GangNam_Falldown"
+    # - "Hyundai_Falldown"
+    # - "Innodep_Falldown"
+    # - "KhonKaen_Falldown"
+    # - "KISA_Falldown"
+    # - "Kumho_Falldown"
+    # - "PIA_Falldown"
+    # - "Soil_Falldown"
+    # - "UGO_Falldown"
+    # - "Yonsei_Falldown"
 
-  # 프레임 샘플링
-  window_size: 15
+  # 프레임 샘플링 (Fire: 15, Falldown: 30)
+  window_size: 15                    # <-- 변경 (카테고리에 맞게)
   interpolation: "forward"
 
   # 추론 파라미터
@@ -148,10 +170,10 @@ evaluate:
 
 # ── 제출 설정 ──
 submit:
-  gradio_url: "http://172.168.47.39:7860/"
-  model_name: "Qwen3_5-2B"
+  gradio_url: "http://172.168.47.39:7860/"               # <-- 고정값
+  model_name: "{모델명}"                                  # <-- 변경: 리더보드 표시 모델명
   task_name: "🌠 VLM 🖥️"
-  datasets_used: "Pretrained"
+  datasets_used: "Pretrained"                             # <-- 변경: "Finetuned" 또는 "Pretrained"
   config_file: "config.json"
   results_base_dir: "results/vllm_eval"
   interval_seconds: 60

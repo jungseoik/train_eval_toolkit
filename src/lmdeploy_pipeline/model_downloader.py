@@ -12,12 +12,22 @@ from pathlib import Path
 from .config import DockerConfig
 
 
+WEIGHT_EXTENSIONS = (".safetensors", ".bin")
+
+
 def _is_valid_model_dir(model_path: Path) -> bool:
-    """모델 디렉토리가 유효한지 확인 (config.json 존재 여부로 판단)."""
+    """모델 디렉토리가 유효한지 확인 (config.json + 가중치 파일 존재 여부로 판단)."""
     if not model_path.is_dir():
         return False
-    # 최소한 config.json이 있어야 유효한 모델 디렉토리
-    return (model_path / "config.json").exists()
+    if not (model_path / "config.json").exists():
+        return False
+    # 가중치 파일이 최소 1개 이상 존재해야 함
+    has_weights = any(
+        f.suffix in WEIGHT_EXTENSIONS
+        for f in model_path.iterdir()
+        if f.is_file()
+    )
+    return has_weights
 
 
 def ensure_model(docker_cfg: DockerConfig) -> str:
@@ -90,10 +100,37 @@ def _download_from_hf(repo_id: str, target_path: Path) -> str:
         ) from e
 
     # 다운로드 후 유효성 검증
-    if not _is_valid_model_dir(target_path):
-        print(f"[MODEL] 경고: 다운로드 완료했으나 config.json이 없습니다. "
-              f"모델 구조를 확인하세요: {target_path}")
-    else:
-        print(f"[MODEL] 다운로드 완료: {target_path}")
+    _validate_model_dir(target_path, repo_id)
+    print(f"[MODEL] 다운로드 완료: {target_path}")
 
     return str(target_path)
+
+
+def _validate_model_dir(model_path: Path, repo_id: str) -> None:
+    """다운로드된 모델 디렉토리의 필수 파일을 검증한다.
+
+    Raises:
+        RuntimeError: config.json 또는 가중치 파일이 없을 때
+    """
+    has_config = (model_path / "config.json").exists()
+    has_weights = any(
+        f.suffix in WEIGHT_EXTENSIONS
+        for f in model_path.iterdir()
+        if f.is_file()
+    )
+
+    missing = []
+    if not has_config:
+        missing.append("config.json")
+    if not has_weights:
+        missing.append(f"가중치 파일 ({', '.join(WEIGHT_EXTENSIONS)})")
+
+    if missing:
+        raise RuntimeError(
+            f"HuggingFace에서 다운로드한 모델이 불완전합니다: {repo_id}\n"
+            f"누락 파일: {', '.join(missing)}\n"
+            f"모델 경로: {model_path}\n"
+            f"확인 사항:\n"
+            f"  - HuggingFace 저장소에 모델 파일이 모두 업로드되었는지 확인\n"
+            f"  - 저장소 주소: https://huggingface.co/{repo_id}"
+        )

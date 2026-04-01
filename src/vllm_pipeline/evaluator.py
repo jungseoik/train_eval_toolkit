@@ -11,7 +11,7 @@ from __future__ import annotations
 import time
 from types import SimpleNamespace
 
-from src.evaluation.vllm_bench_eval import evaluate_benchmark
+from src.evaluation.vllm_bench_eval import InferenceAbortError, evaluate_benchmark
 
 from .config import EvalConfig
 
@@ -70,6 +70,12 @@ def run_evaluation(eval_cfg: EvalConfig, retry_max: int, retry_wait: int) -> dic
                 evaluate_benchmark(bench_name, cfg)
                 succeeded = True
                 break
+            except InferenceAbortError as e:
+                print(f"\n[EVAL] *** ABORTED: {e.bench} / {e.video} / frame={e.frame}")
+                print(f"[EVAL] *** Cause: {e.cause}")
+                print(f"[EVAL] *** overwrite_results=false로 재실행하면 이 지점부터 재개됩니다")
+                failed.append({"benchmark": e.bench, "error": str(e)})
+                return {"success": success, "failed": failed}
             except Exception as e:
                 last_error = str(e)
                 print(f"[EVAL] Error: {e}")
