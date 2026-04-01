@@ -67,6 +67,7 @@ class PipelineConfig:
     name: str
     steps: dict[str, bool]
     cleanup_docker: bool
+    docker_restart_interval: int  # 벤치마크 N개마다 Docker 재시작 (0=재시작 안 함, 기본값 1)
     retry_max_attempts: int
     retry_wait_seconds: int
     docker: DockerConfig
@@ -140,6 +141,7 @@ def load_pipeline_config(yaml_path: str) -> PipelineConfig:
         name=pipeline.get("name", "Unnamed Pipeline"),
         steps=pipeline.get("steps", {"docker": True, "evaluate": True, "submit": True}),
         cleanup_docker=pipeline.get("cleanup_docker", True),
+        docker_restart_interval=pipeline.get("docker_restart_interval", 1),
         retry_max_attempts=retry.get("max_attempts", 3),
         retry_wait_seconds=retry.get("wait_seconds", 30),
         docker=docker_cfg,

@@ -149,14 +149,23 @@ subprocess 방식, Soil_Falldown × 3회 반복:
 - `src/lmdeploy_pipeline/evaluator.py`
 - `src/evaluation/lmdeploy_bench_eval.py`
 
-### 미해결: Docker (lmdeploy 서버) 메모리 증가
+### 적용 완료: Docker 벤치마크 간 재시작
 
-Docker 컨테이너 내부의 lmdeploy 프로세스 메모리 증가는 제어 불가.
-lmdeploy 자체 코드를 수정하지 않는 한 해결할 수 없음.
+Docker 내부 lmdeploy 프로세스의 메모리 증가(Python heap fragmentation)는
+코드 수정으로 해결할 수 없으므로, 벤치마크 사이에 Docker 컨테이너를 재시작하여 메모리를 초기화.
 
-**현재 대응**:
+```yaml
+pipeline:
+  docker_restart_interval: 1   # 매 벤치마크마다 재시작 (기본값)
+                                # 0이면 비활성, N이면 N개마다 재시작
+```
+
+- 재시작 소요 시간: 약 2분 (모델 로딩)
+- 13개 벤치마크 기준: 12회 × 2분 = 약 24분 추가 (전체 5시간 대비 8%)
+- Docker 메모리: 76GB 누적 → 매 벤치마크마다 초기화
+
+**추가 대응 가능**:
 - `cleanup_docker: true` 설정으로 전체 평가 완료 후 Docker 자동 정리
-- API 서버 메모리 절감(18GB → 90MB)으로 Docker가 쓸 수 있는 여유 확보
 
 **추가 대응 가능**:
 - 벤치마크 간 Docker 재시작 (모델 로딩 2~3분 추가)

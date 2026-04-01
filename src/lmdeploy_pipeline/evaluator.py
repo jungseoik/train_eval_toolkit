@@ -176,11 +176,32 @@ def _poll_progress_file(
         stop_event.wait(poll_interval)
 
 
+def _restart_docker(docker_cfg, bench_idx: int, total: int) -> None:
+    """벤치마크 사이에 Docker 컨테이너를 재시작하여 서버 측 메모리를 해소한다."""
+    from .docker_manager import stop_container, start_container, wait_for_ready
+
+    print(f"\n[EVAL] Docker 재시작 ({bench_idx}/{total} 벤치마크 완료 후)")
+    print(f"[EVAL] 컨테이너 정리 중: {docker_cfg.container_name}")
+    stop_container(docker_cfg.container_name)
+
+    print(f"[EVAL] 컨테이너 재시작 중...")
+    start_container(docker_cfg)
+
+    print(f"[EVAL] 서버 준비 대기 중...")
+    ready = wait_for_ready(docker_cfg)
+    if not ready:
+        print(f"[EVAL] WARNING: Docker 서버 준비 실패. 평가를 계속 시도합니다.")
+    else:
+        print(f"[EVAL] Docker 재시작 완료. 메모리 초기화됨.")
+
+
 def run_evaluation(
     eval_cfg: EvalConfig,
     retry_max: int,
     retry_wait: int,
     progress_state: dict | None = None,
+    docker_cfg=None,
+    docker_restart_interval: int = 0,
 ) -> dict:
     """
     벤치마크 목록을 순회하며 평가 실행.
@@ -188,6 +209,9 @@ def run_evaluation(
     각 벤치마크를 별도 프로세스에서 실행하여
     메모리 누적을 방지한다. 벤치마크 내부의
     병렬 처리(concurrency)는 그대로 유지된다.
+
+    docker_restart_interval > 0이면 N개 벤치마크마다
+    Docker 컨테이너를 재시작하여 서버 측 메모리 누적도 해소한다.
 
     반환: {"success": [...], "failed": [...]}
     """
@@ -199,6 +223,8 @@ def run_evaluation(
     print(f"[EVAL] API       : {cfg.API_BASE}")
     print(f"[EVAL] Benchmarks: {benchmarks}")
     print(f"[EVAL] Mode      : subprocess isolation (memory-safe)")
+    if docker_restart_interval > 0 and docker_cfg is not None:
+        print(f"[EVAL] Docker restart: every {docker_restart_interval} benchmark(s)")
 
     # spawn 컨텍스트 사용: 스레드 안에서 fork하면 deadlock 위험
     ctx = multiprocessing.get_context("spawn")
@@ -207,6 +233,15 @@ def run_evaluation(
     failed = []
 
     for idx, bench_name in enumerate(benchmarks):
+        # Docker 재시작 (첫 번째 벤치마크는 이미 떠있으므로 스킵)
+        if (
+            docker_restart_interval > 0
+            and docker_cfg is not None
+            and idx > 0
+            and idx % docker_restart_interval == 0
+        ):
+            _restart_docker(docker_cfg, idx, len(benchmarks))
+
         print(f"\n[EVAL] [{idx+1}/{len(benchmarks)}] {bench_name}")
         _update_bench_progress(progress_state, idx, "in_progress")
 

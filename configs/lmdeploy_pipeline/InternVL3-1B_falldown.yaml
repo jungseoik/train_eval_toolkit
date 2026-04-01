@@ -18,6 +18,7 @@ pipeline:
     evaluate: true
     submit: true
   cleanup_docker: true
+  docker_restart_interval: 1   # 벤치마크 N개마다 Docker 재시작 (0=비활성, 기본값 1)
 
 retry:
   max_attempts: 3

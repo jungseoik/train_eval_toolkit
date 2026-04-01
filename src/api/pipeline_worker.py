@@ -142,6 +142,8 @@ def _background_eval_submit_cleanup(
         eval_result = run_evaluation(
             cfg.evaluate, cfg.retry_max_attempts, cfg.retry_wait_seconds,
             progress_state=state,
+            docker_cfg=cfg.docker,
+            docker_restart_interval=cfg.docker_restart_interval,
         )
         eval_success = eval_result["success"]
 

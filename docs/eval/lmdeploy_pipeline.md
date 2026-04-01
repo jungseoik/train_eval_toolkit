@@ -96,7 +96,13 @@ huggingface-cli download PIA-SPACE-LAB/PIA_AI2team_VQA_falldown \
         ↓
 Docker 컨테이너 기동 (LMDeploy API 서버)
         ↓
-벤치마크 평가 (벤치마크별 subprocess 분리, 내부에서 프레임 단위 병렬 추론)
+┌─ 벤치마크 1 평가 (subprocess, 프레임 단위 병렬 추론)
+│  ↓ subprocess 종료 → 메모리 회수
+│  ↓ Docker 재시작 (docker_restart_interval 설정 시)
+│  ↓
+├─ 벤치마크 2 평가 (subprocess)
+│  ↓ ...
+└─ 벤치마크 N 평가 (subprocess)
         ↓
 결과 제출 (Gradio 리더보드)
         ↓
@@ -106,6 +112,9 @@ Docker 컨테이너 기동 (LMDeploy API 서버)
 각 벤치마크는 독립적인 subprocess(`multiprocessing.Process`)에서 실행됩니다.
 subprocess 종료 시 OS가 메모리를 100% 회수하므로 장시간 평가에서도 메모리가 안정적으로 유지됩니다.
 벤치마크 내부의 프레임 단위 병렬 처리(`concurrency`)는 그대로 유지됩니다.
+
+`docker_restart_interval: 1`(기본값)이면 매 벤치마크 사이에 Docker 컨테이너를 재시작하여
+lmdeploy 서버 측 메모리 누적(Python heap fragmentation)도 해소합니다.
 
 ---
 

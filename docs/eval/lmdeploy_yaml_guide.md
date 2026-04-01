@@ -39,6 +39,7 @@ pipeline:
     evaluate: true
     submit: true
   cleanup_docker: true
+  docker_restart_interval: 1   # 벤치마크 N개마다 Docker 재시작 (0=비활성, 기본값 1)
 
 retry:
   max_attempts: 3
@@ -159,6 +160,7 @@ submit:
 | `steps.evaluate` | 벤치마크 평가 단계 실행 여부 |
 | `steps.submit` | 결과 제출 단계 실행 여부 |
 | `cleanup_docker` | 파이프라인 종료 후 Docker 컨테이너 자동 제거 여부 |
+| `docker_restart_interval` | 벤치마크 N개마다 Docker 재시작하여 서버 메모리 해소 (0=비활성, 기본값 1) |
 
 ### retry
 
