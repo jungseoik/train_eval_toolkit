@@ -218,6 +218,10 @@ async def _evaluate_video_async(
     valid_values: list[str],
     cfg: ModuleType,
     video_label: str,
+    progress_state: dict | None = None,
+    bench_idx: int | None = None,
+    video_done: int = 0,
+    video_total: int = 0,
 ) -> dict[int, int]:
     """
     비디오 1개를 프레임 단위로 추론.
@@ -284,6 +288,12 @@ async def _evaluate_video_async(
                 f"  pred={pred}  [{done}/{len(sampled_frames)}]",
                 end="\r",
             )
+            if done % 10 == 0 or done == len(sampled_frames):
+                _update_video_progress(
+                    progress_state, bench_idx,
+                    video_done, video_total,
+                    frame_done=done, frame_total=len(sampled_frames),
+                )
 
     print()
 
@@ -333,7 +343,28 @@ class BenchmarkSkipError(RuntimeError):
 # 단일 벤치마크 평가
 # ============================================================
 
-def evaluate_benchmark(bench_name: str, cfg: ModuleType) -> None:
+def _update_video_progress(
+    state: dict | None, bench_idx: int | None,
+    video_done: int, video_total: int,
+    frame_done: int = 0, frame_total: int = 0,
+) -> None:
+    """progress_state의 현재 벤치마크에 영상/프레임 진행도를 기록한다."""
+    if state is None or bench_idx is None or state.get("progress") is None:
+        return
+    entry = state["progress"]["benchmarks"][bench_idx]
+    entry["video"] = f"{video_done}/{video_total}"
+    if frame_total > 0:
+        entry["frame"] = f"{frame_done}/{frame_total}"
+    elif "frame" in entry:
+        del entry["frame"]
+
+
+def evaluate_benchmark(
+    bench_name: str,
+    cfg: ModuleType,
+    progress_state: dict | None = None,
+    bench_idx: int | None = None,
+) -> None:
     """
     벤치마크 1개의 모든 비디오를 순차 평가하고
     {OUTPUT_PATH}/{RUN_NAME}/{BenchmarkName}/{video_stem}.csv 에 결과를 저장.
@@ -379,6 +410,7 @@ def evaluate_benchmark(bench_name: str, cfg: ModuleType) -> None:
     overwrite = getattr(cfg, "OVERWRITE_RESULTS", True)
     skipped = 0
 
+    video_done = 0
     for i, (video_path, gt_csv_path) in enumerate(pairs):
         label = f"[{i+1}/{len(pairs)}] {video_path.name[:50]:<50}"
 
@@ -389,6 +421,8 @@ def evaluate_benchmark(bench_name: str, cfg: ModuleType) -> None:
                 actual_rows = sum(1 for _ in open(output_csv, encoding="utf-8"))
                 if actual_rows == expected_rows:
                     skipped += 1
+                    video_done += 1
+                    _update_video_progress(progress_state, bench_idx, video_done, len(pairs))
                     continue
                 print(f"\n  {label}")
                 print(f"  [MISMATCH] expected={expected_rows} actual={actual_rows} -> re-evaluate")
@@ -397,14 +431,21 @@ def evaluate_benchmark(bench_name: str, cfg: ModuleType) -> None:
         else:
             print(f"\n  {label}")
 
+        _update_video_progress(progress_state, bench_idx, video_done, len(pairs))
         t_start = time.perf_counter()
 
         try:
             all_preds = asyncio.run(
-                _evaluate_video_async(video_path, gt_csv_path, category, valid_values, cfg, label)
+                _evaluate_video_async(
+                    video_path, gt_csv_path, category, valid_values, cfg, label,
+                    progress_state=progress_state, bench_idx=bench_idx,
+                    video_done=video_done, video_total=len(pairs),
+                )
             )
         except Exception as exc:
             print(f"  [ERROR] {exc}")
+            video_done += 1
+            _update_video_progress(progress_state, bench_idx, video_done, len(pairs))
             continue
 
         elapsed = time.perf_counter() - t_start
@@ -420,6 +461,8 @@ def evaluate_benchmark(bench_name: str, cfg: ModuleType) -> None:
                 writer.writerow([frame_idx, all_preds.get(frame_idx, 0)])
 
         print(f"  Saved -> {output_csv}")
+        video_done += 1
+        _update_video_progress(progress_state, bench_idx, video_done, len(pairs))
 
     if skipped:
         print(f"\n  Skipped {skipped}/{len(pairs)} (existing results with matching rows)")

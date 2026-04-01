@@ -141,6 +141,7 @@ def _background_eval_submit_cleanup(
         # 평가
         eval_result = run_evaluation(
             cfg.evaluate, cfg.retry_max_attempts, cfg.retry_wait_seconds,
+            progress_state=state,
         )
         eval_success = eval_result["success"]
 
@@ -288,8 +289,16 @@ async def run_pipeline_sse(
         docker_elapsed = time.time() - docker_start
         yield sse_event("docker_ready", f"컨테이너 준비 완료 ({docker_elapsed:.1f}s)")
 
-        # 6. 벤치마크 시작 알림
+        # 6. 벤치마크 시작 알림 + progress 초기화
         benchmarks = cfg.evaluate.benchmarks or []
+        state["progress"] = {
+            "total": len(benchmarks),
+            "completed": 0,
+            "current": None,
+            "benchmarks": [
+                {"name": b, "status": "pending"} for b in benchmarks
+            ],
+        }
         yield sse_event("eval_started", f"벤치마크 평가 시작 ({len(benchmarks)}개). 리더보드에서 결과를 확인하세요.")
         yield sse_event("done", "평가가 시작되었습니다. 추후 벤치마크 결과를 리더보드에서 확인해보세요.")
 
