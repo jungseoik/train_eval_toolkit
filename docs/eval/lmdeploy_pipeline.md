@@ -223,6 +223,8 @@ python -m src.lmdeploy_pipeline -c configs/lmdeploy_pipeline/internvl3_2b_fire.y
 | `submit.config_file` | str | `"config.json"` | 제출 시 첨부할 설정 파일 |
 | `submit.results_base_dir` | str | 필수 | 결과 CSV 기본 디렉토리 |
 | `submit.interval_seconds` | int | `60` | 벤치마크 간 제출 간격 (초) |
+| `submit.benchmark_fail_retry` | int | `2` | 벤치마크 실행 실패 시 총 시도 횟수 |
+| `submit.benchmark_fail_wait` | int | `60` | 벤치마크 실패 재시도 전 대기 시간 (초) |
 
 ---
 
@@ -266,7 +268,7 @@ cp configs/lmdeploy_pipeline/internvl3_2b_fire.yaml \
 | Docker OOM | GPU 메모리 부족 | `lmdeploy_args.tp` 증가 또는 `max-batch-size` 축소 |
 | 포트 충돌 | 이미 사용 중인 포트 | `docker.port` 변경 또는 기존 컨테이너 정리 |
 | 모델 로딩 실패 | 경로 오류 또는 모델 파일 손상 | `model_path` 확인, `config.json` 및 `model.safetensors` 존재 여부 점검 |
-| Gradio 서버 다운 | 네트워크 또는 서버 일시 장애 | retry가 자동 처리, `retry` 설정 조정 |
+| Gradio 서버 다운 | 네트워크 또는 서버 일시 장애 | API 호출 에러는 `retry` 설정으로 자동 재시도. 벤치마크 실행 실패(예: Google Sheets 503)는 `submit.benchmark_fail_retry`(기본 2회) + `submit.benchmark_fail_wait`(기본 60초)로 자동 재시도 |
 
 ---
 

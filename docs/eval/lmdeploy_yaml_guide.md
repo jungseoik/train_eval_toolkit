@@ -143,6 +143,8 @@ submit:
   config_file: "config.json"
   results_base_dir: "results/lmdeploy_eval"
   interval_seconds: 60
+  benchmark_fail_retry: 2    # 벤치마크 실행 실패 시 총 시도 횟수 (기본 2)
+  benchmark_fail_wait: 60    # 벤치마크 실패 재시도 전 대기 시간 (초, 기본 60)
 ```
 
 ---
@@ -282,6 +284,8 @@ Gradio 리더보드에 결과를 제출하는 설정입니다.
 | `model_name` | 리더보드에 표시할 모델 이름 |
 | `datasets_used` | 데이터셋 구분 (`"Finetuned"`, `"Pretrained"` 등) |
 | `interval_seconds` | 벤치마크 간 제출 간격 (초). 서버 부하 방지용 |
+| `benchmark_fail_retry` | 벤치마크 실행 실패 시 총 시도 횟수 (기본 2). 응답에 "실패/Failed" 포함 시 재시도 |
+| `benchmark_fail_wait` | 벤치마크 실패 재시도 전 대기 시간 (초, 기본 60) |
 
 ---
 

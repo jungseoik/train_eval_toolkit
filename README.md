@@ -1,37 +1,30 @@
 # train_eval_toolkit
 
- VLM(InternVL 계열) 데이터 구축, 오토라벨링, 학습, 평가, 체크포인트 배포 준비를 한 저장소에서 다루는 프로젝트입니다.
+VLM(InternVL 계열) 데이터 구축, 오토라벨링, 학습, 평가, 체크포인트 배포 준비를 한 저장소에서 다루는 프로젝트입니다. 데이터 수집은 별도로 진행합니다.
 
 ```mermaid
 flowchart LR
-    B[오토라벨링] --> C[데이터클리닝/검수]
-    C --> D[학습]
-    D --> E[평가]
-    E --> F[배포]
-
-    B -. 사용 도구 .-> B1[main.py autolabel]
-    C -. 사용 도구 .-> C1[main.py data_check / jsonl_inform_check]
-    D -. 사용 도구 .-> D1[internvl3.0 학습 스크립트]
-    E -. 사용 도구 .-> E1[video/image evaluation 스크립트]
-    F -. 사용 도구 .-> F1[merge_lora + 추론용 checkpoint]
+    A[오토라벨링] --> B[데이터클리닝/검수] --> C[학습] --> D[평가] --> E[배포]
 ```
 
-이 저장소는 `오토라벨링 -> 데이터클리닝(검수) -> 학습 -> 평가 -> 배포` 각 단계를 위한 도구 모음입니다. 데이터 수집은 별도로 진행합니다.
+## 단계별 도구
 
-## 단계별 도구 매핑
+**오토라벨링** — `main.py autolabel` → [가이드](docs/labeling/autolabeling.md)
 
-| 단계 | 핵심 작업 | 주요 도구/명령 | 근거 파일 |
-|---|---|---|---|
-| 오토라벨링 | 영상/이미지 자동 라벨 생성 | `main.py autolabel` | [`docs/labeling/autolabeling.md`](docs/labeling/autolabeling.md) |
-| 데이터클리닝/검수 | 빈 라벨/분포/JSONL 품질 점검 | `main.py data_check`, `main.py jsonl_inform_check` | `src/data_checker/stats/json_checker.py`, `src/utils/jsonl_inform_check.py` |
-| 데이터클리닝/검수 | JSON 라벨 → 학습/평가용 JSONL 변환 | `main.py label2jsonl` | [`docs/cleaning/label_to_jsonl.md`](docs/cleaning/label_to_jsonl.md) |
-| 학습 | InternVL 파인튜닝 | `scripts/shell/internvl3.0/*.sh` | [`docs/train/training.md`](docs/train/training.md) |
-| 평가 | 비디오/이미지 정량 평가 | `evaluate_video_classfication_edit.py`, `evaluate_image_classfication.py` | [`docs/eval/eval_image_falldown.md`](docs/eval/eval_image_falldown.md) |
-| 평가 | 비디오 정성 평가 (threshold + 오버레이) | `evaluate_qualitative_video_threshold_image.py` | [`docs/eval/eval_quality.md`](docs/eval/eval_quality.md) |
-| 평가 | vLLM 자동화 파이프라인 (Docker→평가→제출) | `python -m src.vllm_pipeline.cli` | [`docs/eval/vllm_pipeline.md`](docs/eval/vllm_pipeline.md) |
-| 평가 | LMDeploy 벤치마크 파이프라인 (파인튜닝 모델) | `python -m src.lmdeploy_pipeline` | [`docs/eval/lmdeploy_pipeline.md`](docs/eval/lmdeploy_pipeline.md) |
-| 평가 | 평가 요청 API (외부 YAML 요청 수신) | `uvicorn src.api.main:app` | [`docs/eval/pipeline_api.md`](docs/eval/pipeline_api.md) |
-| 배포 | LoRA 병합 후 추론용 체크포인트 생성 | `merge_lora.py` | `src/training/tools/merge_lora.py`, `scripts/pipe_line/train_eval_save_hyundai_8_20.sh` |
+**데이터클리닝/검수**
+- 분포/품질 점검: `main.py data_check`, `main.py jsonl_inform_check`
+- 라벨 → JSONL 변환: `main.py label2jsonl` → [가이드](docs/cleaning/label_to_jsonl.md)
+
+**학습** — `scripts/shell/internvl3.0/*.sh` → [가이드](docs/train/training.md)
+
+**평가**
+- 이미지 정량 평가: `evaluate_image_classfication.py` → [가이드](docs/eval/eval_image_falldown.md)
+- 비디오 정성 평가: `evaluate_qualitative_video_threshold_image.py` → [가이드](docs/eval/eval_quality.md)
+- vLLM 파이프라인 (Docker→평가→제출): `python -m src.vllm_pipeline.cli` → [가이드](docs/eval/vllm_pipeline.md)
+- LMDeploy 파이프라인 (파인튜닝 모델): `python -m src.lmdeploy_pipeline` → [가이드](docs/eval/lmdeploy_pipeline.md)
+- 평가 요청 API (외부 YAML 요청 수신): `uvicorn src.api.main:app` → [가이드](docs/eval/pipeline_api.md)
+
+**배포** — `merge_lora.py` → LoRA 병합 후 추론용 체크포인트 생성
 
 ## 빠른 시작
 
