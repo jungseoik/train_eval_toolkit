@@ -57,6 +57,8 @@ class SubmitConfig:
     results_base_dir: str
     config_file: str = "config.json"
     interval_seconds: int = 60
+    benchmark_fail_retry: int = 2
+    benchmark_fail_wait: int = 60
 
 
 @dataclass
@@ -130,6 +132,8 @@ def load_pipeline_config(yaml_path: str) -> PipelineConfig:
         config_file=submit_raw.get("config_file", "config.json"),
         results_base_dir=submit_raw.get("results_base_dir", ""),
         interval_seconds=submit_raw.get("interval_seconds", 60),
+        benchmark_fail_retry=submit_raw.get("benchmark_fail_retry", 2),
+        benchmark_fail_wait=submit_raw.get("benchmark_fail_wait", 60),
     )
 
     return PipelineConfig(

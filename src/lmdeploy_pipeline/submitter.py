@@ -62,26 +62,28 @@ def submit_results(
     return {"success": success, "failed": failed}
 
 
-def _submit_single_benchmark(
+_FAIL_MARKERS = ("실패", "Failed", "failed")
+
+
+def _is_benchmark_failed(result: str) -> bool:
+    """응답 문자열에서 벤치마크 실행 실패 여부를 판별."""
+    result_str = str(result)
+    return any(marker in result_str for marker in _FAIL_MARKERS)
+
+
+def _try_api_call(
     client: Client,
     submit_cfg: SubmitConfig,
     benchmark_name: str,
-    csv_folder: Path,
+    csv_paths: list[Path],
     max_attempts: int,
     wait_seconds: int,
-) -> bool:
-    """단일 벤치마크 제출. retry 포함."""
-    csv_paths = sorted(csv_folder.glob("*.csv"))
-    if not csv_paths:
-        print(f"[SUBMIT] No CSV files in {csv_folder}")
-        return False
-
-    print(f"[SUBMIT] CSV count: {len(csv_paths)}")
-
+) -> str | None:
+    """API 호출 (네트워크 에러 시 retry). 성공하면 응답 문자열, 실패하면 None."""
     for attempt in range(1, max_attempts + 1):
         try:
             if attempt > 1:
-                print(f"[SUBMIT] Retry {attempt}/{max_attempts}")
+                print(f"[SUBMIT] API retry {attempt}/{max_attempts}")
 
             result = client.predict(
                 model_name=submit_cfg.model_name,
@@ -94,7 +96,7 @@ def _submit_single_benchmark(
             )
 
             print(f"[SUBMIT] Result: {result}")
-            return True
+            return str(result)
 
         except Exception as e:
             print(f"[SUBMIT] Error: {e}")
@@ -102,5 +104,45 @@ def _submit_single_benchmark(
                 print(f"[SUBMIT] Waiting {wait_seconds}s before retry...")
                 time.sleep(wait_seconds)
 
-    print(f"[SUBMIT] FAILED after {max_attempts} attempts: {benchmark_name}")
+    return None
+
+
+def _submit_single_benchmark(
+    client: Client,
+    submit_cfg: SubmitConfig,
+    benchmark_name: str,
+    csv_folder: Path,
+    max_attempts: int,
+    wait_seconds: int,
+) -> bool:
+    """단일 벤치마크 제출. API retry + 벤치마크 실패 retry 포함."""
+    csv_paths = sorted(csv_folder.glob("*.csv"))
+    if not csv_paths:
+        print(f"[SUBMIT] No CSV files in {csv_folder}")
+        return False
+
+    print(f"[SUBMIT] CSV count: {len(csv_paths)}")
+
+    bench_retry = submit_cfg.benchmark_fail_retry
+    bench_wait = submit_cfg.benchmark_fail_wait
+
+    for bench_attempt in range(1, bench_retry + 1):
+        if bench_attempt > 1:
+            print(f"[SUBMIT] ⏳ Benchmark retry {bench_attempt}/{bench_retry} (waiting {bench_wait}s)...")
+            time.sleep(bench_wait)
+
+        result = _try_api_call(
+            client, submit_cfg, benchmark_name, csv_paths, max_attempts, wait_seconds,
+        )
+
+        if result is None:
+            print(f"[SUBMIT] FAILED - API call failed after {max_attempts} attempts: {benchmark_name}")
+            return False
+
+        if not _is_benchmark_failed(result):
+            return True
+
+        print(f"[SUBMIT] ⚠️ Benchmark execution failed in server response")
+
+    print(f"[SUBMIT] FAILED after {bench_retry} benchmark attempts: {benchmark_name}")
     return False
