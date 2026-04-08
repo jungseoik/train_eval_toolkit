@@ -49,6 +49,7 @@ class EvalConfig:
     negative_label: str
     prompt_templates: dict[str, str] = field(default_factory=dict)
     overwrite_results: bool = True
+    eval_mode: str = "json"                             # "json" (기존) | "cls" (특수 토큰 yes/no 분류)
 
 
 @dataclass
@@ -127,6 +128,7 @@ def load_pipeline_config(yaml_path: str) -> PipelineConfig:
         negative_label=eval_raw.get("negative_label", "normal"),
         prompt_templates=eval_raw.get("prompt_templates", {}),
         overwrite_results=eval_raw.get("overwrite_results", True),
+        eval_mode=eval_raw.get("eval_mode", "json"),
     )
 
     submit_cfg = SubmitConfig(

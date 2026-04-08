@@ -265,6 +265,21 @@ docker:
   hf_repo_id: "PIA-SPACE-LAB/PIA_AI2team_VQA_falldown"  # 모델 없으면 자동 다운로드
 ```
 
+**평가 모드 선택** (`eval_mode`): 모델의 응답 방식에 따라 두 가지 평가 모드를 지원합니다.
+
+| eval_mode | 프롬프트 | 모델 응답 | 파싱 방식 |
+|-----------|---------|----------|----------|
+| `"json"` (기본값) | 긴 텍스트 프롬프트 | JSON (`{"category": "falldown", ...}`) | JSON 파싱 → category 추출 |
+| `"cls"` | 특수 토큰 (예: `<CLS_FALLDOWN>`) | `yes` / `no` | 단순 문자열 비교 (대소문자 무관) |
+
+```yaml
+evaluate:
+  eval_mode: "cls"                     # "json"(기본) 또는 "cls"
+  max_tokens: 1                        # cls 모드는 yes/no 단일 토큰
+  prompt_templates:
+    falldown: "<CLS_FALLDOWN>"         # 특수 토큰 프롬프트
+```
+
 > 사전 준비 및 상세 가이드: [docs/eval/lmdeploy_pipeline.md](docs/eval/lmdeploy_pipeline.md)
 > YAML 설정 작성법: [docs/eval/lmdeploy_yaml_guide.md](docs/eval/lmdeploy_yaml_guide.md)
 > 프로세스 설계 배경 및 흐름도: [docs/eval/eval_process_design.md](docs/eval/eval_process_design.md)

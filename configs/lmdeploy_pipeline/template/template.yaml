@@ -60,6 +60,7 @@ evaluate:
   bench_base_path: "/mnt/PoC_benchmark/huggingface_benchmarks_dataset/Leaderboard_bench"             # <-- 고정값
   output_path: "results/lmdeploy_eval"
   overwrite_results: false           # true=항상 덮어쓰기, false=기존 CSV 존재+row수 일치 시 스킵
+  eval_mode: "json"                  # 평가 모드: "json"(기존 JSON 파싱) | "cls"(특수 토큰 yes/no 분류)
 
   # ── 벤치마크 목록 ──
   # Falldown (13개) 또는 Fire (6개) 중 택 1. 아래는 Falldown 기준.

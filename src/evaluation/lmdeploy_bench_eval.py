@@ -207,6 +207,11 @@ def classify(parsed: str, positive_label: str) -> int:
     return 1 if parsed == positive_label else 0
 
 
+def parse_cls_output(raw_text: str) -> int:
+    """CLS 토큰 모델의 yes/no 출력을 0/1로 변환. 대소문자 무관."""
+    return 1 if raw_text.strip().lower() == "yes" else 0
+
+
 # ============================================================
 # 단일 비디오 평가
 # ============================================================
@@ -270,7 +275,10 @@ async def _evaluate_video_async(
                     cfg.MODEL, b64, prompt,
                     cfg.MAX_TOKENS, cfg.TEMPERATURE, cfg.SEED,
                 )
-                pred = classify(parse_model_output(raw_text, valid_values), category)
+                if getattr(cfg, 'EVAL_MODE', 'json') == 'cls':
+                    pred = parse_cls_output(raw_text)
+                else:
+                    pred = classify(parse_model_output(raw_text, valid_values), category)
             except Exception as exc:
                 warnings.warn(f"Inference failed for {video_path.name} frame={fidx}: {exc}")
                 pred = 0

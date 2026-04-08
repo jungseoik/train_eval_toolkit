@@ -251,15 +251,40 @@ LMDeploy 서버에 전달되는 인자입니다.
 
 `interpolation`은 기본값 `"forward"`를 사용합니다. 샘플 프레임의 예측값을 다음 샘플까지 그대로 유지합니다.
 
+#### eval_mode (평가 모드)
+
+모델의 응답 방식에 따라 평가 모드를 선택합니다. 미지정 시 기본값 `"json"`이 사용됩니다.
+
+| 값 | 프롬프트 | 모델 응답 형식 | 파싱 방식 | max_tokens 권장 |
+|----|---------|---------------|----------|-----------------|
+| `"json"` (기본값) | 긴 텍스트 프롬프트 | JSON (`{"category": "falldown", ...}`) | JSON 파싱 → category 추출 | `15` |
+| `"cls"` | 특수 토큰 (예: `<CLS_FALLDOWN>`) | `yes` / `no` | 단순 문자열 비교 (대소문자 무관) | `1` |
+
+**CLS 모드 동작 원리**:
+- 프롬프트로 `<CLS_FALLDOWN>` 같은 특수 토큰을 전달
+- 모델이 `yes` 또는 `no`로 응답
+- `yes` → 1 (양성, falldown), `no` 또는 기타 → 0 (음성)
+- 대소문자 구분 없음 (`Yes`, `YES`, `yes` 모두 동일 처리)
+
+```yaml
+# CLS 모드 설정 예시
+evaluate:
+  eval_mode: "cls"
+  max_tokens: 1
+  prompt_templates:
+    falldown: "<CLS_FALLDOWN>"
+    default: "<CLS_FALLDOWN>"
+```
+
 #### 추론 파라미터
 
-일반적으로 기본값을 그대로 사용합니다.
+일반적으로 기본값을 그대로 사용합니다. CLS 모드에서는 `max_tokens`를 `1`로 설정합니다.
 
 | 필드 | 기본값 | 설명 |
 |------|--------|------|
 | `concurrency` | `10` | 프레임 추출 + 추론 동시 처리 수 |
 | `jpeg_quality` | `95` | 프레임 JPEG 인코딩 품질 |
-| `max_tokens` | `15` | 모델 최대 생성 토큰 수 |
+| `max_tokens` | `15` | 모델 최대 생성 토큰 수. CLS 모드에서는 `1` 권장 |
 | `temperature` | `0.0` | 샘플링 온도. 0이면 결정적 출력 |
 | `seed` | `0` | 재현성을 위한 시드 |
 | `negative_label` | `"normal"` | 음성 클래스 레이블. 프롬프트의 "normal"과 일치해야 함 |
@@ -439,6 +464,17 @@ default: "Is {category} visible in this image? Answer only with 0 (no) or 1 (yes
 ```
 
 > 간단 프롬프트는 `{category}`가 실행 시 실제 카테고리명으로 치환됩니다. 상세 프롬프트에 비해 정확도가 낮을 수 있습니다.
+
+**CLS 토큰 프롬프트** (`eval_mode: "cls"` 전용):
+
+```yaml
+# eval_mode: "cls" 일 때 사용
+# 모델이 특수 토큰을 받으면 yes/no로 응답하는 경우
+falldown: "<CLS_FALLDOWN>"
+default: "<CLS_FALLDOWN>"
+```
+
+> CLS 모드에서는 프롬프트가 특수 토큰 하나로 구성됩니다. 모델이 yes/no로 응답하고, 파서가 자동으로 1/0으로 변환합니다. `max_tokens: 1`을 함께 설정하세요.
 
 ---
 
