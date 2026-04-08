@@ -54,6 +54,7 @@ evaluate:
   bench_base_path: "/mnt/PoC_benchmark/huggingface_benchmarks_dataset/Leaderboard_bench"
   output_path: "results/lmdeploy_eval"
   overwrite_results: false
+  eval_mode: "json"
 
   benchmarks:
     - "PIA_Fire"
