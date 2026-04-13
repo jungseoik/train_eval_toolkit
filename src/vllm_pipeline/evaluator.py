@@ -43,12 +43,33 @@ def _build_cfg_namespace(eval_cfg: EvalConfig) -> SimpleNamespace:
         NEGATIVE_LABEL=eval_cfg.negative_label,
         PROMPT_TEMPLATES=eval_cfg.prompt_templates,
         OVERWRITE_RESULTS=eval_cfg.overwrite_results,
+        EVAL_MODE=eval_cfg.eval_mode,
     )
 
 
 def _cfg_to_dict(cfg: SimpleNamespace) -> dict:
     """SimpleNamespace를 pickle-safe dict로 변환."""
     return vars(cfg)
+
+
+def _update_bench_progress(
+    state: dict | None, idx: int, status: str, **extra,
+) -> None:
+    """progress_state의 벤치마크 항목을 업데이트한다."""
+    if state is None or state.get("progress") is None:
+        return
+    progress = state["progress"]
+    bench_entry = progress["benchmarks"][idx]
+    bench_entry["status"] = status
+    bench_entry.update(extra)
+    if status == "in_progress":
+        progress["current"] = bench_entry["name"]
+    elif status in ("completed", "failed", "skipped"):
+        progress["completed"] = sum(
+            1 for b in progress["benchmarks"] if b["status"] in ("completed", "failed", "skipped")
+        )
+        if all(b["status"] != "in_progress" for b in progress["benchmarks"]):
+            progress["current"] = None
 
 
 # ============================================================
@@ -71,7 +92,7 @@ def _benchmark_worker(
     - 프로세스 종료 시 OS가 메모리를 전부 회수
     """
     from types import SimpleNamespace
-    from src.evaluation.vllm_bench_eval import InferenceAbortError, evaluate_benchmark
+    from src.evaluation.vllm_bench_eval import BenchmarkSkipError, evaluate_benchmark
 
     cfg = SimpleNamespace(**cfg_dict)
 
@@ -97,10 +118,9 @@ def _benchmark_worker(
             )
             succeeded = True
             break
-        except InferenceAbortError as e:
+        except BenchmarkSkipError as e:
             last_error = str(e)
-            print(f"\n[EVAL] *** ABORTED: {e.bench} / {e.video} / frame={e.frame}")
-            print(f"[EVAL] *** Cause: {e.cause}")
+            print(f"[EVAL] SKIP (failure): {e}")
             break
         except Exception as e:
             last_error = str(e)
@@ -217,11 +237,7 @@ def run_evaluation(
             _restart_docker(docker_cfg, idx, len(benchmarks))
 
         print(f"\n[EVAL] [{idx+1}/{len(benchmarks)}] {bench_name}")
-        if progress_state is not None and progress_state.get("progress") is not None:
-            progress = progress_state["progress"]
-            bench_entry = progress["benchmarks"][idx]
-            bench_entry["status"] = "in_progress"
-            progress["current"] = bench_entry["name"]
+        _update_bench_progress(progress_state, idx, "in_progress")
 
         # 임시 파일: 진행도 + 결과 전달용
         progress_fd, progress_file = tempfile.mkstemp(suffix=".json", prefix="eval_progress_")
@@ -274,17 +290,11 @@ def run_evaluation(
 
         if result.get("succeeded"):
             success.append(bench_name)
-            if progress_state is not None and progress_state.get("progress") is not None:
-                progress = progress_state["progress"]
-                progress["benchmarks"][idx]["status"] = "completed"
-                progress["completed"] = sum(
-                    1 for b in progress["benchmarks"] if b["status"] in ("completed", "failed")
-                )
+            _update_bench_progress(progress_state, idx, "completed")
         else:
             error = result.get("error", "unknown error")
             failed.append({"benchmark": bench_name, "error": error})
-            if progress_state is not None and progress_state.get("progress") is not None:
-                progress_state["progress"]["benchmarks"][idx]["status"] = "failed"
+            _update_bench_progress(progress_state, idx, "failed")
             print(f"[EVAL] FAILED after {retry_max} attempts: {bench_name}")
 
     return {"success": success, "failed": failed}

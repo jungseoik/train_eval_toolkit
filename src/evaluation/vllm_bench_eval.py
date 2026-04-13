@@ -29,17 +29,13 @@ import cv2
 import httpx
 
 
-class InferenceAbortError(RuntimeError):
-    """추론 재시도 실패 시 발생. 중단 지점 정보를 포함."""
+class BenchmarkSkipError(RuntimeError):
+    """벤치마크 경로/데이터 문제로 스킵해야 할 때 발생."""
 
-    def __init__(self, bench: str, video: str, frame: int, cause: Exception):
-        self.bench = bench
-        self.video = video
-        self.frame = frame
-        self.cause = cause
-        super().__init__(
-            f"Inference aborted: bench={bench}, video={video}, frame={frame} — {cause}"
-        )
+    def __init__(self, bench_name: str, reason: str):
+        self.bench_name = bench_name
+        self.reason = reason
+        super().__init__(f"[{bench_name}] {reason}")
 
 
 # ============================================================
@@ -215,6 +211,11 @@ def classify(parsed: str, positive_label: str) -> int:
     return 1 if parsed == positive_label else 0
 
 
+def parse_cls_output(raw_text: str) -> int:
+    """CLS 토큰 모델의 yes/no 출력을 0/1로 변환. 대소문자 무관."""
+    return 1 if raw_text.strip().lower() == "yes" else 0
+
+
 # ============================================================
 # 단일 비디오 평가
 # ============================================================
@@ -226,7 +227,10 @@ async def _evaluate_video_async(
     valid_values: list[str],
     cfg: ModuleType,
     video_label: str,
-    bench_name: str = "",
+    progress_state: dict | None = None,
+    bench_idx: int | None = None,
+    video_done: int = 0,
+    video_total: int = 0,
 ) -> dict[int, int]:
     """
     비디오 1개를 프레임 단위로 추론.
@@ -275,43 +279,33 @@ async def _evaluate_video_async(
                     cfg.MODEL, b64, prompt,
                     cfg.MAX_TOKENS, cfg.TEMPERATURE, cfg.SEED,
                 )
-                pred = classify(parse_model_output(raw_text, valid_values), category)
-            except Exception as exc:
-                warnings.warn(f"Inference failed for {video_path.name} frame={fidx}: {exc}, retrying...")
-                # 1회 재시도
-                try:
-                    raw_text = await _infer_frame(
-                        client, api_url,
-                        cfg.MODEL, b64, prompt,
-                        cfg.MAX_TOKENS, cfg.TEMPERATURE, cfg.SEED,
-                    )
+                if getattr(cfg, 'EVAL_MODE', 'json') == 'cls':
+                    pred = parse_cls_output(raw_text)
+                else:
                     pred = classify(parse_model_output(raw_text, valid_values), category)
-                except Exception as retry_exc:
-                    raise InferenceAbortError(
-                        bench=bench_name,
-                        video=video_path.name,
-                        frame=fidx,
-                        cause=retry_exc,
-                    )
+            except Exception as exc:
+                warnings.warn(f"Inference failed for {video_path.name} frame={fidx}: {exc}")
+                pred = 0
         return fidx, pred
 
     async with httpx.AsyncClient(limits=limits, timeout=300.0) as client:
         tasks = [asyncio.create_task(process_frame(fidx)) for fidx in sampled_frames]
         done = 0
-        try:
-            for coro in asyncio.as_completed(tasks):
-                fidx, pred = await coro
-                sampled_preds[fidx] = pred
-                done += 1
-                print(
-                    f"    {video_label}  frame {fidx:5d}/{total_frames-1}"
-                    f"  pred={pred}  [{done}/{len(sampled_frames)}]",
-                    end="\r",
+        for coro in asyncio.as_completed(tasks):
+            fidx, pred = await coro
+            sampled_preds[fidx] = pred
+            done += 1
+            print(
+                f"    {video_label}  frame {fidx:5d}/{total_frames-1}"
+                f"  pred={pred}  [{done}/{len(sampled_frames)}]",
+                end="\r",
+            )
+            if done % 10 == 0 or done == len(sampled_frames):
+                _update_video_progress(
+                    progress_state, bench_idx,
+                    video_done, video_total,
+                    frame_done=done, frame_total=len(sampled_frames),
                 )
-        except InferenceAbortError:
-            for t in tasks:
-                t.cancel()
-            raise
 
     print()
 
@@ -403,8 +397,7 @@ def evaluate_benchmark(
     """
     bench_path = Path(cfg.BENCH_BASE_PATH) / bench_name
     if not bench_path.exists():
-        print(f"[SKIP] Benchmark path not found: {bench_path}")
-        return
+        raise BenchmarkSkipError(bench_name, f"Benchmark path not found: {bench_path}")
 
     category = get_category_from_bench(bench_name)
 
@@ -417,12 +410,13 @@ def evaluate_benchmark(
     try:
         pairs = find_video_gt_pairs(bench_path, category)
     except FileNotFoundError as exc:
-        print(f"[ERROR] {exc}")
-        return
+        raise BenchmarkSkipError(bench_name, str(exc)) from exc
 
     if not pairs:
-        print("[SKIP] No (mp4, csv) pairs found.")
-        return
+        raise BenchmarkSkipError(
+            bench_name,
+            f"No (mp4, csv) pairs found in {bench_path}/dataset/{category}",
+        )
 
     print(f"Videos    : {len(pairs)}")
 
@@ -462,12 +456,11 @@ def evaluate_benchmark(
         try:
             all_preds = asyncio.run(
                 _evaluate_video_async(
-                    video_path, gt_csv_path, category, valid_values,
-                    cfg, label, bench_name=bench_name,
+                    video_path, gt_csv_path, category, valid_values, cfg, label,
+                    progress_state=progress_state, bench_idx=bench_idx,
+                    video_done=video_done, video_total=len(pairs),
                 )
             )
-        except InferenceAbortError:
-            raise
         except Exception as exc:
             print(f"  [ERROR] {exc}")
             video_done += 1
