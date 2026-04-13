@@ -59,6 +59,7 @@ evaluate:
   bench_base_path: "/mnt/PoC_benchmark/huggingface_benchmarks_dataset/Leaderboard_bench"             # <-- 고정값
   output_path: "/home/gpuadmin/Repo/seoik/train_eval_toolkit/results/vllm_eval"
   overwrite_results: false           # true=항상 덮어쓰기, false=기존 CSV 존재+row수 일치 시 스킵
+  eval_mode: "json"                  # "json"(기본)=JSON 파싱, "cls"=yes/no 분류
 
   # ── 벤치마크 목록 ──
   # Falldown (13개) 또는 Fire (6개) 중 택 1. 아래는 Fire 기준.

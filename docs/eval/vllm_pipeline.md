@@ -70,9 +70,22 @@ python -m src.vllm_pipeline.cli -c configs/vllm_pipeline/qwen35_2b_fire.yaml --s
 
 | 키 | 타입 | 기본값 | 설명 |
 |----|------|--------|------|
-| `evaluate.eval_config_path` | str | 필수 | 기존 config.py 경로 |
-| `evaluate.benchmarks` | list | config.py의 BENCHMARKS | 평가할 벤치마크 목록 |
-| `evaluate.overrides` | dict | {} | config.py 속성 런타임 덮어쓰기 |
+| `evaluate.benchmarks` | list | 필수 | 평가할 벤치마크 목록 |
+| `evaluate.model` | str | 필수 | API 호출 시 모델 이름 |
+| `evaluate.run_name` | str | 필수 | 결과 디렉토리명 |
+| `evaluate.api_base` | str | `http://127.0.0.1:8000/v1` | vLLM 서버 API 주소 |
+| `evaluate.bench_base_path` | str | 필수 | 벤치마크 데이터 루트 경로 |
+| `evaluate.output_path` | str | 필수 | 평가 결과 저장 경로 |
+| `evaluate.eval_mode` | str | `"json"` | 평가 모드: `"json"` (JSON 파싱) 또는 `"cls"` (yes/no 분류) |
+| `evaluate.window_size` | int | 15 | 프레임 샘플링 간격 (Fire: 15, Falldown: 30) |
+| `evaluate.interpolation` | str | `"forward"` | 인터폴레이션 방법 (`forward` / `backward`) |
+| `evaluate.concurrency` | int | 10 | 동시 추론 요청 수 |
+| `evaluate.jpeg_quality` | int | 95 | 프레임 JPEG 인코딩 품질 |
+| `evaluate.max_tokens` | int | 15 | 최대 응답 토큰 수 (cls 모드 시 1 권장) |
+| `evaluate.temperature` | float | 0.0 | 생성 온도 |
+| `evaluate.seed` | int | 0 | 랜덤 시드 |
+| `evaluate.negative_label` | str | `"normal"` | 미감지 레이블 |
+| `evaluate.prompt_templates` | dict | {} | 카테고리별 프롬프트 템플릿 |
 | `evaluate.overwrite_results` | bool | `true` | `true`: 항상 덮어쓰기, `false`: 기존 CSV 존재 + GT row 수 일치 시 스킵 |
 
 ### submit 섹션
@@ -100,8 +113,8 @@ python -m src.vllm_pipeline.cli -c configs/vllm_pipeline/qwen35_2b_fire.yaml --s
 | `docker.model` | HuggingFace 모델 이름 |
 | `docker.container_name` | 고유한 컨테이너 이름 |
 | `docker.vllm_args` | 모델 크기에 맞게 조정 (`tensor-parallel-size` 등) |
-| `evaluate.overrides.MODEL` | 평가에 사용할 모델명 |
-| `evaluate.overrides.RUN_NAME` | 결과 디렉토리명 |
+| `evaluate.model` | 평가에 사용할 모델명 (`docker.model`과 동일) |
+| `evaluate.run_name` | 결과 디렉토리명 |
 | `submit.model_name` | 리더보드에 표시될 모델명 |
 
 ---
@@ -124,7 +137,8 @@ python -m src.vllm_pipeline.cli -c configs/vllm_pipeline/qwen35_2b_fire.yaml --s
 | Docker OOM | GPU 메모리 부족 | `docker.vllm_args`에서 `kv-cache-memory-bytes` 축소 또는 `tensor-parallel-size` 증가 |
 | 포트 충돌 | 이미 사용 중인 포트 | `docker.port` 변경 또는 기존 컨테이너 정리 |
 | Gradio 서버 다운 | 네트워크/서버 일시 장애 | API 호출 에러는 `retry` 설정으로 자동 재시도. 벤치마크 실행 실패(예: Google Sheets 503)는 `submit.benchmark_fail_retry`(기본 2회) + `submit.benchmark_fail_wait`(기본 60초)로 자동 재시도 |
-| 벤치마크 경로 없음 | 결과 파일 미생성 | 해당 벤치마크를 skip하고 다음 벤치마크 진행 |
+| 벤치마크 경로 없음 | 데이터 경로 누락 | `BenchmarkSkipError` 발생 → 해당 벤치마크를 skip하고 다음 벤치마크 진행 |
+| 프레임 추론 실패 | 서버 일시 불안정 | 해당 프레임을 pred=0으로 처리하고 계속 진행 (벤치마크 전체가 중단되지 않음) |
 
 ---
 

@@ -236,11 +236,17 @@ python -m src.vllm_pipeline.cli -c configs/vllm_pipeline/qwen35_2b_fire.yaml
 python -m src.vllm_pipeline.cli -c configs/vllm_pipeline/qwen35_2b_fire.yaml --steps evaluate submit
 ```
 
-YAML `evaluate.overwrite_results` 옵션으로 기존 결과 덮어쓰기/스킵 제어 가능:
+**평가 모드 선택** (`eval_mode`): 모델의 응답 방식에 따라 두 가지 평가 모드를 지원합니다.
+
+| eval_mode | 프롬프트 | 모델 응답 | 파싱 방식 |
+|-----------|---------|----------|----------|
+| `"json"` (기본값) | 긴 텍스트 프롬프트 | JSON (`{"category": "fire", ...}`) | JSON 파싱 → category 추출 |
+| `"cls"` | 특수 토큰 (예: `<CLS_FIRE>`) | `yes` / `no` | 단순 문자열 비교 (대소문자 무관) |
 
 ```yaml
 evaluate:
-  overwrite_results: true   # true(기본값)=항상 덮어쓰기, false=기존 CSV 존재+row수 일치 시 스킵
+  eval_mode: "json"          # "json"(기본) 또는 "cls"
+  overwrite_results: true    # true(기본값)=항상 덮어쓰기, false=기존 CSV 존재+row수 일치 시 스킵
 ```
 
 > 상세 가이드: [docs/eval/vllm_pipeline.md](docs/eval/vllm_pipeline.md)
