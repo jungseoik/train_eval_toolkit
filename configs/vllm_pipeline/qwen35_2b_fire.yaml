@@ -55,6 +55,7 @@ evaluate:
   bench_base_path: "/mnt/PoC_benchmark/huggingface_benchmarks_dataset/Leaderboard_bench"
   output_path: "/home/gpuadmin/Repo/seoik/train_eval_toolkit/results/vllm_eval"
   overwrite_results: false
+  eval_mode: "json"
 
   benchmarks:
     - "PIA_Fire"

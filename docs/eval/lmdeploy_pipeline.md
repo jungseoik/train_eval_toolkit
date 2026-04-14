@@ -126,7 +126,7 @@ lmdeploy 서버 측 메모리 누적(Python heap fragmentation)도 해소합니�
 conda activate llm
 
 # 전체 파이프라인 실행
-python -m src.lmdeploy_pipeline -c configs/lmdeploy_pipeline/internvl3_2b_fire.yaml
+python -m src.lmdeploy_pipeline -c configs/lmdeploy_pipeline/InternVL3-2B_fire.yaml
 ```
 
 ---
@@ -137,10 +137,10 @@ python -m src.lmdeploy_pipeline -c configs/lmdeploy_pipeline/internvl3_2b_fire.y
 
 ```bash
 # Docker만 기동
-python -m src.lmdeploy_pipeline -c configs/lmdeploy_pipeline/internvl3_2b_fire.yaml --steps docker
+python -m src.lmdeploy_pipeline -c configs/lmdeploy_pipeline/InternVL3-2B_fire.yaml --steps docker
 
 # 평가 후 결과 제출 (Docker 이미 기동 상태)
-python -m src.lmdeploy_pipeline -c configs/lmdeploy_pipeline/internvl3_2b_fire.yaml --steps evaluate submit
+python -m src.lmdeploy_pipeline -c configs/lmdeploy_pipeline/InternVL3-2B_fire.yaml --steps evaluate submit
 ```
 
 | `--steps` 인자 | 동작 |
@@ -165,6 +165,7 @@ python -m src.lmdeploy_pipeline -c configs/lmdeploy_pipeline/internvl3_2b_fire.y
 | `pipeline.steps.evaluate` | bool | `true` | 평가 단계 실행 여부 |
 | `pipeline.steps.submit` | bool | `true` | 제출 단계 실행 여부 |
 | `pipeline.cleanup_docker` | bool | `true` | 종료 후 Docker 자동 제거 여부 |
+| `pipeline.docker_restart_interval` | int | `1` | 벤치마크 N개마다 Docker 재시작하여 서버 메모리 해소 (0=비활성) |
 
 ### retry 섹션
 
@@ -244,7 +245,7 @@ python -m src.lmdeploy_pipeline -c configs/lmdeploy_pipeline/internvl3_2b_fire.y
 
 ```bash
 # 예시: 새 모델용 설정 파일 생성
-cp configs/lmdeploy_pipeline/internvl3_2b_fire.yaml \
+cp configs/lmdeploy_pipeline/InternVL3-2B_fire.yaml \
    configs/lmdeploy_pipeline/internvl3_8b_fire.yaml
 ```
 
@@ -291,7 +292,7 @@ src/evaluation/
     lmdeploy_bench_eval.py  # 프레임 단위 벤치마크 평가
 
 configs/lmdeploy_pipeline/
-    internvl3_2b_fire.yaml  # InternVL3-2B Fire 설정 예시
+    InternVL3-2B_fire.yaml  # InternVL3-2B Fire 설정 예시
 
 configs/lmdeploy_eval/
     config.py               # standalone 평가 설정

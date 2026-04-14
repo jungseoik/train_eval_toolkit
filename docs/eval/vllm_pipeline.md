@@ -21,11 +21,11 @@ cp configs/vllm_pipeline/template/template.yaml configs/vllm_pipeline/{모델명
 
 # 2. 전체 파이프라인 실행
 conda activate llm
-python -m src.vllm_pipeline.cli -c configs/vllm_pipeline/qwen35_2b_fire.yaml
+python -m src.vllm_pipeline -c configs/vllm_pipeline/qwen35_2b_fire.yaml
 
 # 특정 단계만 실행
-python -m src.vllm_pipeline.cli -c configs/vllm_pipeline/qwen35_2b_fire.yaml --steps docker
-python -m src.vllm_pipeline.cli -c configs/vllm_pipeline/qwen35_2b_fire.yaml --steps evaluate submit
+python -m src.vllm_pipeline -c configs/vllm_pipeline/qwen35_2b_fire.yaml --steps docker
+python -m src.vllm_pipeline -c configs/vllm_pipeline/qwen35_2b_fire.yaml --steps evaluate submit
 ```
 
 ---
