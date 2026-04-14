@@ -1,0 +1,121 @@
+# ============================================================
+# vLLM 벤치마크 평가 파이프라인 설정
+#
+# Qwen3.5-4B 베이스 모델의 Smoke 벤치마크 테스트용.
+# (테스트셋 평가 Precision/Recall/F1 과는 별개 프로세스)
+#
+# 사용법:
+#   python -m src.vllm_pipeline -c configs/vllm_pipeline/qwen35_4b_smoke.yaml
+#
+# 모델 교체 시 변경 필드:
+#   docker.model, evaluate.model, evaluate.run_name, submit.model_name
+# ============================================================
+
+pipeline:
+  name: "Qwen3.5-4B Smoke Benchmark"
+  steps:
+    docker: true
+    evaluate: true
+    submit: true
+  cleanup_docker: true
+  docker_restart_interval: 1   # 벤치마크 N개마다 Docker 재시작 (0=비활성, 기본값 1)
+
+retry:
+  max_attempts: 3
+  wait_seconds: 30
+
+# ── Docker 설정 ──
+docker:
+  container_name: "qwen35_4b_smoke"
+  image: "vllm/vllm-openai:cu130-nightly"
+  gpus: "all"
+  port: 8000
+  ipc: "host"
+  volumes:
+    - "~/.cache/huggingface:/root/.cache/huggingface"
+  model: "Qwen/Qwen3.5-4B"
+  vllm_args:
+    tensor-parallel-size: 1
+    max-model-len: 8192
+    kv-cache-memory-bytes: "10G"
+    max-num-seqs: 128
+    max-num-batched-tokens: 131072
+    limit-mm-per-prompt: '{"image": 1}'
+    seed: 0
+  startup:
+    timeout_seconds: 300
+    poll_interval_seconds: 5
+    stream_logs: true
+
+# ── 평가 설정 ──
+evaluate:
+  model: "Qwen/Qwen3.5-4B"
+  run_name: "Qwen3_5-4B"
+  api_base: "http://127.0.0.1:8000/v1"
+  bench_base_path: "/mnt/PoC_benchmark/huggingface_benchmarks_dataset/Leaderboard_bench"
+  output_path: "/home/gpuadmin/Repo/seoik/train_eval_toolkit/results/vllm_eval"
+  overwrite_results: false
+  eval_mode: "cls"
+
+  benchmarks:
+    - "Soil_v2_Smoke"
+
+  # 프레임 샘플링
+  window_size: 15
+  interpolation: "forward"
+
+  # 추론 파라미터
+  concurrency: 100
+  jpeg_quality: 95
+  max_tokens: 1              # cls 모드: yes/no 단일 토큰
+  temperature: 0.0
+  seed: 0
+  negative_label: "normal"
+
+  # 카테고리별 프롬프트
+  prompt_templates:
+    smoke: |
+      Analyze the image carefully.
+
+      Task:
+      Determine whether the image shows real visible smoke in the scene.
+
+      Return "yes" only if there is actual smoke physically present in the environment, such as:
+      - a localized smoke plume
+      - rising, drifting, or spreading smoke
+      - smoke with a visible origin, direction, or shape
+      - white, gray, or black smoke emitted from a specific area or object
+
+      Return "no" for:
+      - lens fog
+      - condensation
+      - water droplets
+      - humidity haze
+      - camera blur
+      - dirty or smeared lens
+      - low contrast or washed-out frames
+      - glare or overexposure
+      - general misty appearance without a clear smoke source
+      - any ambiguous or uncertain case
+
+      Important rules:
+      - The smoke must be part of the real scene, not caused by the camera or lens condition.
+      - Do not classify smoke based on a globally foggy or low-visibility image alone.
+      - A localized smoke shape, direction, or source must be visible.
+      - If uncertain, return "no".
+
+      Answer only with:
+      "yes"
+      or
+      "no"
+    default: "Is {category} visible in this image? Answer only with yes or no."
+
+# ── 제출 설정 ──
+submit:
+  gradio_url: "http://172.168.47.39:7860/"
+  model_name: "Qwen3_5-4B"
+  task_name: "🌠 VLM 🖥️"
+  datasets_used: "Pretrained"
+  config_file: "config.json"
+  results_base_dir: "results/vllm_eval"
+  interval_seconds: 60
