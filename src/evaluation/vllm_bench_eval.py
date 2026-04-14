@@ -124,6 +124,7 @@ async def _infer_frame(
     max_tokens: int,
     temperature: float,
     seed: int,
+    enable_thinking: bool | None = None,
 ) -> str:
     """이미지 1장을 vLLM 서버로 보내고 응답 텍스트를 반환."""
     payload = {
@@ -144,6 +145,8 @@ async def _infer_frame(
         "temperature": temperature,
         "seed": seed,
     }
+    if enable_thinking is not None:
+        payload["chat_template_kwargs"] = {"enable_thinking": enable_thinking}
     resp = await client.post(api_url, json=payload)
     resp.raise_for_status()
     data = resp.json()
@@ -278,6 +281,7 @@ async def _evaluate_video_async(
                     client, api_url,
                     cfg.MODEL, b64, prompt,
                     cfg.MAX_TOKENS, cfg.TEMPERATURE, cfg.SEED,
+                    enable_thinking=getattr(cfg, 'ENABLE_THINKING', None),
                 )
                 if getattr(cfg, 'EVAL_MODE', 'json') == 'cls':
                     pred = parse_cls_output(raw_text)

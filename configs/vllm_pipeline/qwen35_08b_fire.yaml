@@ -56,6 +56,7 @@ evaluate:
   output_path: "/home/gpuadmin/Repo/seoik/train_eval_toolkit/results/vllm_eval"
   overwrite_results: false
   eval_mode: "json"
+  enable_thinking: false
 
   benchmarks:
     - "PIA_Fire"
@@ -109,33 +110,18 @@ evaluate:
       }
 
     fire: |
-      Analyze this image carefully. Only classify it as "fire" if there are ACTUAL FLAMES or ACTIVE FIRE visible in the image.
+      Is there a real flame or active fire burning in this image?
 
-      Important classification rules:
+      Answer "fire" if you see an actual flame or active combustion.
 
-      - The "fire" category applies ONLY to images with:
-       - visible flames or burning fire
-       - active combustion or blazing materials
-       - actual fire sources (e.g., campfire, house fire, candle flame, burning car, torch flame)
-      - This includes:
-       - Real flames from any source
-       - Active burning or combustion
-       - Visible fire with smoke and flames
-       - Burning vehicles or cars on fire
-       - Torches, flamethrowers, or similar devices with visible flames
-      - The "normal" category applies to:
-       - Fire-related objects WITHOUT actual flames (fire trucks, fire extinguishers, fire hydrants)
-       - Red colors, sunset glows, red lights, or the sun
-       - Fire emojis or cartoon representations of fire
-       - Text or words containing "fire" (signs, labels, written text)
-       - Any image without visible flames or active fire
-       - welding sparks, grinding sparks, cutting sparks, or metal sparks without visible flames
-       - glowing metal fragments, hot particles, or red/orange sparks from construction tools
-       - brief spark showers from machinery that do not show sustained flames or active burning
+      Answer "normal" if the image only contains:
+      - lights, headlights, sunlight, or reflections
+      - fire trucks, fire extinguishers, or fire-related equipment
+      - smoke without a visible flame
 
-      Answer in JSON format with BOTH of the following fields:
+      Answer in JSON format:
       - "category": either "fire" or "normal"
-      - "description": a brief reason why this classification was made (e.g., "visible flames from campfire", "fire truck without flames")
+      - "description": a brief reason
 
       Example:
       {

@@ -44,6 +44,7 @@ def _build_cfg_namespace(eval_cfg: EvalConfig) -> SimpleNamespace:
         PROMPT_TEMPLATES=eval_cfg.prompt_templates,
         OVERWRITE_RESULTS=eval_cfg.overwrite_results,
         EVAL_MODE=eval_cfg.eval_mode,
+        ENABLE_THINKING=eval_cfg.enable_thinking,
     )
 
 

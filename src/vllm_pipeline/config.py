@@ -47,6 +47,7 @@ class EvalConfig:
     prompt_templates: dict[str, str] = field(default_factory=dict)
     overwrite_results: bool = True
     eval_mode: str = "json"                             # "json" (기존) | "cls" (특수 토큰 yes/no 분류)
+    enable_thinking: bool | None = None                  # Qwen3.5 thinking 모드 제어 (None=미설정, False=비활성화)
 
 
 @dataclass
@@ -124,6 +125,7 @@ def load_pipeline_config(yaml_path: str) -> PipelineConfig:
         prompt_templates=eval_raw.get("prompt_templates", {}),
         overwrite_results=eval_raw.get("overwrite_results", True),
         eval_mode=eval_raw.get("eval_mode", "json"),
+        enable_thinking=eval_raw.get("enable_thinking", None),
     )
 
     submit_cfg = SubmitConfig(

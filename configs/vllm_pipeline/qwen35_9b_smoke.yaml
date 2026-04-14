@@ -1,18 +1,18 @@
 # ============================================================
 # vLLM 벤치마크 평가 파이프라인 설정
 #
-# Qwen3.5-2B 베이스 모델의 Fire 벤치마크 테스트용.
+# Qwen3.5-9B 베이스 모델의 Smoke 벤치마크 테스트용.
 # (테스트셋 평가 Precision/Recall/F1 과는 별개 프로세스)
 #
 # 사용법:
-#   python -m src.vllm_pipeline -c configs/vllm_pipeline/qwen35_2b_fire.yaml
+#   python -m src.vllm_pipeline -c configs/vllm_pipeline/qwen35_9b_smoke.yaml
 #
 # 모델 교체 시 변경 필드:
 #   docker.model, evaluate.model, evaluate.run_name, submit.model_name
 # ============================================================
 
 pipeline:
-  name: "Qwen3.5-2B Fire Benchmark"
+  name: "Qwen3.5-9B Smoke Benchmark"
   steps:
     docker: true
     evaluate: true
@@ -26,14 +26,14 @@ retry:
 
 # ── Docker 설정 ──
 docker:
-  container_name: "qwen35_2b_fire"
+  container_name: "qwen35_9b_smoke"
   image: "vllm/vllm-openai:cu130-nightly"
   gpus: "all"
   port: 8000
   ipc: "host"
   volumes:
     - "~/.cache/huggingface:/root/.cache/huggingface"
-  model: "Qwen/Qwen3.5-2B"
+  model: "Qwen/Qwen3.5-9B"
   vllm_args:
     tensor-parallel-size: 1
     max-model-len: 8192
@@ -49,8 +49,8 @@ docker:
 
 # ── 평가 설정 ──
 evaluate:
-  model: "Qwen/Qwen3.5-2B"
-  run_name: "Qwen3_5-2B"
+  model: "Qwen/Qwen3.5-9B"
+  run_name: "Qwen3_5-9B"
   api_base: "http://127.0.0.1:8000/v1"
   bench_base_path: "/mnt/PoC_benchmark/huggingface_benchmarks_dataset/Leaderboard_bench"
   output_path: "/home/gpuadmin/Repo/seoik/train_eval_toolkit/results/vllm_eval"
@@ -59,7 +59,7 @@ evaluate:
   enable_thinking: false
 
   benchmarks:
-    - "Soil_v2_Fire"
+    - "Soil_v2_Smoke"
 
   # 프레임 샘플링
   window_size: 15
@@ -75,23 +75,46 @@ evaluate:
 
   # 카테고리별 프롬프트
   prompt_templates:
-    fire: |
-      Is there a real flame or active fire burning in this image?
+    smoke: |
+      Analyze the image carefully.
 
-      Answer "yes" if you see an actual flame or active combustion.
+      Task:
+      Determine whether the image shows real visible smoke in the scene.
 
-      Answer "no" if the image only contains:
-      - lights, headlights, sunlight, or reflections
-      - fire trucks, fire extinguishers, or fire-related equipment
-      - smoke without a visible flame
+      Return "yes" only if there is actual smoke physically present in the environment, such as:
+      - a localized smoke plume
+      - rising, drifting, or spreading smoke
+      - smoke with a visible origin, direction, or shape
+      - white, gray, or black smoke emitted from a specific area or object
 
-      Answer only: "yes" or "no"
+      Return "no" for:
+      - lens fog
+      - condensation
+      - water droplets
+      - humidity haze
+      - camera blur
+      - dirty or smeared lens
+      - low contrast or washed-out frames
+      - glare or overexposure
+      - general misty appearance without a clear smoke source
+      - any ambiguous or uncertain case
+
+      Important rules:
+      - The smoke must be part of the real scene, not caused by the camera or lens condition.
+      - Do not classify smoke based on a globally foggy or low-visibility image alone.
+      - A localized smoke shape, direction, or source must be visible.
+      - If uncertain, return "no".
+
+      Answer only with:
+      "yes"
+      or
+      "no"
     default: "Is {category} visible in this image? Answer only with yes or no."
 
 # ── 제출 설정 ──
 submit:
   gradio_url: "http://172.168.47.39:7860/"
-  model_name: "Qwen3_5-2B"
+  model_name: "Qwen3_5-9B"
   task_name: "🌠 VLM 🖥️"
   datasets_used: "Pretrained"
   config_file: "config.json"

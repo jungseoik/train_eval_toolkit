@@ -56,6 +56,7 @@ evaluate:
   output_path: "/home/gpuadmin/Repo/seoik/train_eval_toolkit/results/vllm_eval"
   overwrite_results: false
   eval_mode: "cls"
+  enable_thinking: false
 
   benchmarks:
     - "Soil_v2_Fire"
@@ -75,33 +76,16 @@ evaluate:
   # 카테고리별 프롬프트
   prompt_templates:
     fire: |
-      Analyze the image carefully.
+      Is there a real flame or active fire burning in this image?
 
-      Determine whether a clearly visible real flame is present.
+      Answer "yes" if you see an actual flame or active combustion.
 
-      Return "yes" only if the image clearly shows:
-      - an actual flame
-      - active burning
-      - sustained visible combustion
+      Answer "no" if the image only contains:
+      - lights, headlights, sunlight, or reflections
+      - fire trucks, fire extinguishers, or fire-related equipment
+      - smoke without a visible flame
 
-      Return "no" for all other cases, including:
-      - bright lights
-      - reflections
-      - lens flare
-      - overexposed areas
-      - sunlight or warm lighting
-      - smoke without flame
-      - sparks without sustained flame
-      - fire extinguishers or fire-related objects
-      - orange/red glowing regions without a clear flame
-
-      Do not infer fire from color, brightness, glow, or scene context alone.
-      If the image is ambiguous, blurry, distant, or the flame is not clearly visible, return "no".
-
-      Answer only with:
-      "yes"
-      or
-      "no"
+      Answer only: "yes" or "no"
     default: "Is {category} visible in this image? Answer only with yes or no."
 
 # ── 제출 설정 ──

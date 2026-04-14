@@ -1,18 +1,18 @@
 # ============================================================
 # vLLM 벤치마크 평가 파이프라인 설정
 #
-# Qwen3.5-2B 베이스 모델의 Fire 벤치마크 테스트용.
+# Qwen3.5-0.8B 베이스 모델의 Soil_v2 Fire 벤치마크 테스트용.
 # (테스트셋 평가 Precision/Recall/F1 과는 별개 프로세스)
 #
 # 사용법:
-#   python -m src.vllm_pipeline -c configs/vllm_pipeline/qwen35_2b_fire.yaml
+#   python -m src.vllm_pipeline -c configs/vllm_pipeline/qwen35_08b_fire_Soil_v2.yaml
 #
 # 모델 교체 시 변경 필드:
 #   docker.model, evaluate.model, evaluate.run_name, submit.model_name
 # ============================================================
 
 pipeline:
-  name: "Qwen3.5-2B Fire Benchmark"
+  name: "Qwen3.5-0.8B Fire Soil_v2 Benchmark"
   steps:
     docker: true
     evaluate: true
@@ -26,14 +26,14 @@ retry:
 
 # ── Docker 설정 ──
 docker:
-  container_name: "qwen35_2b_fire"
+  container_name: "qwen35_08b_fire_soil_v2"
   image: "vllm/vllm-openai:cu130-nightly"
   gpus: "all"
   port: 8000
   ipc: "host"
   volumes:
     - "~/.cache/huggingface:/root/.cache/huggingface"
-  model: "Qwen/Qwen3.5-2B"
+  model: "Qwen/Qwen3.5-0.8B"
   vllm_args:
     tensor-parallel-size: 1
     max-model-len: 8192
@@ -49,8 +49,8 @@ docker:
 
 # ── 평가 설정 ──
 evaluate:
-  model: "Qwen/Qwen3.5-2B"
-  run_name: "Qwen3_5-2B"
+  model: "Qwen/Qwen3.5-0.8B"
+  run_name: "Qwen3_5-08B"
   api_base: "http://127.0.0.1:8000/v1"
   bench_base_path: "/mnt/PoC_benchmark/huggingface_benchmarks_dataset/Leaderboard_bench"
   output_path: "/home/gpuadmin/Repo/seoik/train_eval_toolkit/results/vllm_eval"
@@ -91,7 +91,7 @@ evaluate:
 # ── 제출 설정 ──
 submit:
   gradio_url: "http://172.168.47.39:7860/"
-  model_name: "Qwen3_5-2B"
+  model_name: "Qwen3_5-08B"
   task_name: "🌠 VLM 🖥️"
   datasets_used: "Pretrained"
   config_file: "config.json"
