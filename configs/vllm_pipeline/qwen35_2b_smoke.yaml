@@ -1,18 +1,18 @@
 # ============================================================
 # vLLM 벤치마크 평가 파이프라인 설정
 #
-# Qwen3.5-2B 베이스 모델의 Fire 벤치마크 테스트용.
+# Qwen3.5-2B 베이스 모델의 Smoke 벤치마크 테스트용.
 # (테스트셋 평가 Precision/Recall/F1 과는 별개 프로세스)
 #
 # 사용법:
-#   python -m src.vllm_pipeline -c configs/vllm_pipeline/qwen35_2b_fire.yaml
+#   python -m src.vllm_pipeline -c configs/vllm_pipeline/qwen35_2b_smoke.yaml
 #
 # 모델 교체 시 변경 필드:
 #   docker.model, evaluate.model, evaluate.run_name, submit.model_name
 # ============================================================
 
 pipeline:
-  name: "Qwen3.5-2B Fire Benchmark"
+  name: "Qwen3.5-2B Smoke Benchmark"
   steps:
     docker: true
     evaluate: true
@@ -26,7 +26,7 @@ retry:
 
 # ── Docker 설정 ──
 docker:
-  container_name: "qwen35_2b_fire"
+  container_name: "qwen35_2b_smoke"
   image: "vllm/vllm-openai:cu130-nightly"
   gpus: "all"
   port: 8000
@@ -58,7 +58,7 @@ evaluate:
   eval_mode: "cls"
 
   benchmarks:
-    - "Soil_v2_Fire"
+    - "Soil_v2_Smoke"
 
   # 프레임 샘플링
   window_size: 15
@@ -74,29 +74,35 @@ evaluate:
 
   # 카테고리별 프롬프트
   prompt_templates:
-    fire: |
+    smoke: |
       Analyze the image carefully.
 
-      Determine whether a clearly visible real flame is present.
+      Task:
+      Determine whether the image shows real visible smoke in the scene.
 
-      Return "yes" only if the image clearly shows:
-      - an actual flame
-      - active burning
-      - sustained visible combustion
+      Return "yes" only if there is actual smoke physically present in the environment, such as:
+      - a localized smoke plume
+      - rising, drifting, or spreading smoke
+      - smoke with a visible origin, direction, or shape
+      - white, gray, or black smoke emitted from a specific area or object
 
-      Return "no" for all other cases, including:
-      - bright lights
-      - reflections
-      - lens flare
-      - overexposed areas
-      - sunlight or warm lighting
-      - smoke without flame
-      - sparks without sustained flame
-      - fire extinguishers or fire-related objects
-      - orange/red glowing regions without a clear flame
+      Return "no" for:
+      - lens fog
+      - condensation
+      - water droplets
+      - humidity haze
+      - camera blur
+      - dirty or smeared lens
+      - low contrast or washed-out frames
+      - glare or overexposure
+      - general misty appearance without a clear smoke source
+      - any ambiguous or uncertain case
 
-      Do not infer fire from color, brightness, glow, or scene context alone.
-      If the image is ambiguous, blurry, distant, or the flame is not clearly visible, return "no".
+      Important rules:
+      - The smoke must be part of the real scene, not caused by the camera or lens condition.
+      - Do not classify smoke based on a globally foggy or low-visibility image alone.
+      - A localized smoke shape, direction, or source must be visible.
+      - If uncertain, return "no".
 
       Answer only with:
       "yes"
