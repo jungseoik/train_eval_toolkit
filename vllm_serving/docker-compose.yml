@@ -10,6 +10,7 @@ services:
     environment:
       - NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-all}
       - KV_CACHE_MEMORY_BYTES=${KV_CACHE_MEMORY_BYTES:-}
+      - HF_TOKEN=${HF_TOKEN:-}
     deploy:
       resources:
         reservations:
