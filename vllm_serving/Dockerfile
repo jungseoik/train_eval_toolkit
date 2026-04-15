@@ -23,6 +23,7 @@ ENV MAX_MODEL_LEN=8192
 ENV MAX_NUM_SEQS=128
 ENV MAX_NUM_BATCHED_TOKENS=131072
 ENV GPU_MEMORY_UTILIZATION=0.9
+ENV KV_CACHE_MEMORY_BYTES=""
 ENV PORT=8000
 
 # HuggingFace 캐시 디렉토리
@@ -31,8 +32,13 @@ ENV HF_HOME=/root/.cache/huggingface
 EXPOSE ${PORT}
 
 # 엔트리포인트: 환경변수를 vLLM serve 인자로 변환
+# KV_CACHE_MEMORY_BYTES가 설정되어 있으면 --kv-cache-memory-bytes 인자를 추가
 ENTRYPOINT ["sh", "-c", "\
-    python -m vllm.entrypoints.openai.api_server \
+    KV_CACHE_ARG=\"\"; \
+    if [ -n \"${KV_CACHE_MEMORY_BYTES}\" ]; then \
+        KV_CACHE_ARG=\"--kv-cache-memory-bytes ${KV_CACHE_MEMORY_BYTES}\"; \
+    fi; \
+    exec python -m vllm.entrypoints.openai.api_server \
     --model ${MODEL_NAME} \
     --tensor-parallel-size ${TENSOR_PARALLEL_SIZE} \
     --max-model-len ${MAX_MODEL_LEN} \
@@ -42,5 +48,6 @@ ENTRYPOINT ["sh", "-c", "\
     --port ${PORT} \
     --limit-mm-per-prompt '{\"image\": 1}' \
     --seed 0 \
+    ${KV_CACHE_ARG} \
     ${EXTRA_VLLM_ARGS} \
 "]
