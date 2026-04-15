@@ -17,7 +17,7 @@ ARG BASE_IMAGE=vllm/vllm-openai:latest
 FROM ${BASE_IMAGE}
 
 # 기본 환경변수 (docker-compose 또는 docker run -e 로 오버라이드 가능)
-ENV MODEL_NAME="Qwen/Qwen2.5-VL-7B-Instruct"
+ENV MODEL_NAME="Qwen/Qwen3.5-2B"
 ENV TENSOR_PARALLEL_SIZE=1
 ENV MAX_MODEL_LEN=8192
 ENV MAX_NUM_SEQS=128

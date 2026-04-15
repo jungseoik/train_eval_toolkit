@@ -23,7 +23,7 @@ async def single_inference():
     """이미지 1장을 보내고 결과를 받는 기본 예시."""
     async with VLLMClient(
         api_base="http://localhost:8000/v1",
-        model="Qwen/Qwen2.5-VL-7B-Instruct",
+        model="Qwen/Qwen3.5-2B",
         max_concurrency=3,
     ) as client:
         # 서버 준비 대기 (최초 실행 시 모델 로딩에 시간 소요)
@@ -70,7 +70,7 @@ async def batch_inference():
 
     async with VLLMClient(
         api_base="http://localhost:8000/v1",
-        model="Qwen/Qwen2.5-VL-7B-Instruct",
+        model="Qwen/Qwen3.5-2B",
         max_concurrency=3,  # 최대 3개 동시 요청
     ) as client:
         print(f"총 {len(items)}개 이미지 배치 추론 시작...")
@@ -99,7 +99,7 @@ async def bytes_inference():
 
     async with VLLMClient(
         api_base="http://localhost:8000/v1",
-        model="Qwen/Qwen2.5-VL-7B-Instruct",
+        model="Qwen/Qwen3.5-2B",
     ) as client:
         response = await client.infer(
             image=image_bytes,

@@ -7,7 +7,7 @@ vLLM 비동기 추론 클라이언트.
 사용법:
     from client import VLLMClient
 
-    async with VLLMClient("http://localhost:8000/v1", model="Qwen/Qwen2.5-VL-7B-Instruct") as client:
+    async with VLLMClient("http://localhost:8000/v1", model="Qwen/Qwen3.5-2B") as client:
         result = await client.infer("image.jpg", "이 이미지에 불이 있나요?")
         print(result)
 """
@@ -30,7 +30,7 @@ class VLLMClient:
     def __init__(
         self,
         api_base: str = "http://localhost:8000/v1",
-        model: str = "Qwen/Qwen2.5-VL-7B-Instruct",
+        model: str = "Qwen/Qwen3.5-2B",
         max_concurrency: int = 3,
         max_tokens: int = 256,
         temperature: float = 0.0,

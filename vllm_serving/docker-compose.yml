@@ -28,7 +28,7 @@ services:
           KV_CACHE_ARG="--kv-cache-memory-bytes $${KV_CACHE_MEMORY_BYTES}"
         fi
         exec python -m vllm.entrypoints.openai.api_server \
-          --model ${MODEL_NAME:-Qwen/Qwen2.5-VL-7B-Instruct} \
+          --model ${MODEL_NAME:-Qwen/Qwen3.5-2B} \
           --tensor-parallel-size ${TENSOR_PARALLEL_SIZE:-1} \
           --max-model-len ${MAX_MODEL_LEN:-8192} \
           --max-num-seqs ${MAX_NUM_SEQS:-128} \
