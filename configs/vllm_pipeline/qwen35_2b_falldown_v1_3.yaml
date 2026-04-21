@@ -1,0 +1,102 @@
+# ============================================================
+# vLLM 벤치마크 평가 파이프라인 설정 - Falldown (CLS 모드)
+#
+# PIA_AI2team_VQA_falldown_v1.3 (Qwen3.5-2B 베이스 파인튜닝) 모델의 Falldown 벤치마크 테스트용.
+# <CLS_FALLDOWN> 특수 토큰으로 yes/no 분류 응답을 반환하는 모델.
+# (테스트셋 평가 Precision/Recall/F1 과는 별개 프로세스)
+#
+# 사용법:
+#   python -m src.vllm_pipeline -c configs/vllm_pipeline/qwen35_2b_falldown_v1_3.yaml
+#
+# 모델 교체 시 변경 필드:
+#   docker.model, evaluate.model, evaluate.run_name, submit.model_name
+# ============================================================
+
+pipeline:
+  name: "PIA_AI2team_VQA_falldown_v1.3 Benchmark (vLLM)"
+  steps:
+    docker: true
+    evaluate: true
+    submit: true
+  cleanup_docker: true
+  docker_restart_interval: 1
+
+retry:
+  max_attempts: 3
+  wait_seconds: 30
+
+# ── Docker 설정 ──
+docker:
+  container_name: "pia_ai2team_vqa_falldown_v1_3_vllm"
+  image: "vllm/vllm-openai:cu130-nightly"
+  gpus: "all"
+  port: 8000
+  ipc: "host"
+  volumes:
+    - "~/.cache/huggingface:/root/.cache/huggingface"
+  model: "PIA-SPACE-LAB/PIA_AI2team_VQA_falldown_v1.3"
+  vllm_args:
+    tensor-parallel-size: 1
+    max-model-len: 8192
+    kv-cache-memory-bytes: "10G"
+    max-num-seqs: 128
+    max-num-batched-tokens: 131072
+    limit-mm-per-prompt: '{"image": 1}'
+    seed: 0
+  startup:
+    timeout_seconds: 300
+    poll_interval_seconds: 5
+    stream_logs: true
+
+# ── 평가 설정 ──
+evaluate:
+  model: "PIA-SPACE-LAB/PIA_AI2team_VQA_falldown_v1.3"
+  run_name: "PIA_AI2team_VQA_falldown_v1.3"
+  api_base: "http://127.0.0.1:8000/v1"
+  bench_base_path: "/mnt/PoC_benchmark/huggingface_benchmarks_dataset/Leaderboard_bench"
+  output_path: "/home/gpuadmin/Repo/seoik/train_eval_toolkit/results/vllm_eval"
+  overwrite_results: false
+  eval_mode: "cls"
+  enable_thinking: false
+
+  benchmarks:
+    - "ABB_Falldown"
+    - "Coupang_Falldown"
+    - "DTRO_Falldown"
+    - "GangNam_Falldown"
+    - "Hyundai_Falldown"
+    - "Innodep_Falldown"
+    - "KhonKaen_Falldown"
+    - "KISA_Falldown"
+    - "Kumho_Falldown"
+    - "PIA_Falldown"
+    - "Soil_Falldown"
+    - "UGO_Falldown"
+    - "Yonsei_Falldown"
+
+  # 프레임 샘플링 (Falldown: 30)
+  window_size: 30
+  interpolation: "forward"
+
+  # 추론 파라미터
+  concurrency: 100
+  jpeg_quality: 95
+  max_tokens: 1              # cls 모드: yes/no 단일 토큰
+  temperature: 0.0
+  seed: 0
+  negative_label: "normal"
+
+  # CLS 모드 프롬프트: 특수 토큰만 전달
+  prompt_templates:
+    falldown: "<CLS_FALLDOWN>"
+    default: "<CLS_FALLDOWN>"
+
+# ── 제출 설정 ──
+submit:
+  gradio_url: "http://172.168.47.39:7860/"
+  model_name: "PIA_AI2team_VQA_falldown_v1.3"
+  task_name: "🌠 VLM 🖥️"
+  datasets_used: "Finetuned"
+  config_file: "config.json"
+  results_base_dir: "results/vllm_eval"
+  interval_seconds: 60
