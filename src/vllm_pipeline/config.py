@@ -18,6 +18,7 @@ class DockerConfig:
     container_name: str
     image: str
     model: str
+    hf_repo_id: str = ""           # 지정 시 snapshot_download로 선제 다운로드
     gpus: str = "all"
     port: int = 8000
     ipc: str = "host"
@@ -63,9 +64,13 @@ class SubmitConfig:
     benchmark_fail_wait: int = 60
 
 
+SUPPORTED_MODES = ("vllm", "lmdeploy")
+
+
 @dataclass
 class PipelineConfig:
     name: str
+    mode: str                      # "vllm" | "lmdeploy" (필수)
     steps: dict[str, bool]
     cleanup_docker: bool
     docker_restart_interval: int  # 벤치마크 N개마다 Docker 재시작 (0=재시작 안 함, 기본값 1)
@@ -76,8 +81,21 @@ class PipelineConfig:
     submit: SubmitConfig
 
 
-def load_pipeline_config(yaml_path: str) -> PipelineConfig:
-    """YAML 파일을 로드하여 PipelineConfig 데이터클래스로 변환."""
+def load_pipeline_config(
+    yaml_path: str,
+    expected_mode: str | None = None,
+) -> PipelineConfig:
+    """YAML 파일을 로드하여 PipelineConfig 데이터클래스로 변환.
+
+    Args:
+        yaml_path: YAML 파일 경로.
+        expected_mode: 호출자가 기대하는 mode ("vllm" | "lmdeploy"). 지정 시
+            YAML의 `pipeline.mode`와 불일치하면 ValueError. None이면 검증만 수행.
+
+    Raises:
+        FileNotFoundError: YAML 파일 미존재.
+        ValueError: `pipeline.mode` 미지정, 지원하지 않는 값, expected_mode 불일치.
+    """
     path = Path(yaml_path)
     if not path.exists():
         raise FileNotFoundError(f"Pipeline config not found: {path}")
@@ -91,12 +109,28 @@ def load_pipeline_config(yaml_path: str) -> PipelineConfig:
     eval_raw = raw.get("evaluate", {})
     submit_raw = raw.get("submit", {})
 
+    mode = pipeline.get("mode")
+    if not mode:
+        raise ValueError(
+            "pipeline.mode is required. Set to 'vllm' or 'lmdeploy' in the YAML."
+        )
+    if mode not in SUPPORTED_MODES:
+        raise ValueError(
+            f"Unsupported pipeline.mode='{mode}'. Must be one of {SUPPORTED_MODES}."
+        )
+    if expected_mode is not None and mode != expected_mode:
+        raise ValueError(
+            f"pipeline.mode='{mode}' but this loader expects '{expected_mode}'. "
+            "YAML 파일과 호출 모듈이 일치해야 합니다."
+        )
+
     startup = docker_raw.pop("startup", {})
 
     docker_cfg = DockerConfig(
         container_name=docker_raw["container_name"],
         image=docker_raw["image"],
         model=docker_raw["model"],
+        hf_repo_id=docker_raw.get("hf_repo_id", ""),
         gpus=docker_raw.get("gpus", "all"),
         port=docker_raw.get("port", 8000),
         ipc=docker_raw.get("ipc", "host"),
@@ -142,6 +176,7 @@ def load_pipeline_config(yaml_path: str) -> PipelineConfig:
 
     return PipelineConfig(
         name=pipeline.get("name", "Unnamed Pipeline"),
+        mode=mode,
         steps=pipeline.get("steps", {"docker": True, "evaluate": True, "submit": True}),
         cleanup_docker=pipeline.get("cleanup_docker", True),
         docker_restart_interval=pipeline.get("docker_restart_interval", 1),

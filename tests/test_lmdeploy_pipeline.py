@@ -63,6 +63,7 @@ class TestConfig:
         config = {
             "pipeline": {
                 "name": "Test Pipeline",
+                "mode": "lmdeploy",
                 "steps": {"docker": True, "evaluate": True, "submit": False},
                 "cleanup_docker": True,
             },
@@ -421,7 +422,7 @@ class TestModelDownloader:
     def test_config_hf_repo_id_default(self, tmp_path):
         """hf_repo_id 미지정 시 빈 문자열."""
         config = {
-            "pipeline": {"name": "Test", "steps": {"docker": True, "evaluate": True, "submit": False}, "cleanup_docker": True},
+            "pipeline": {"name": "Test", "mode": "lmdeploy", "steps": {"docker": True, "evaluate": True, "submit": False}, "cleanup_docker": True},
             "retry": {"max_attempts": 1, "wait_seconds": 5},
             "docker": {
                 "container_name": "test",
@@ -445,7 +446,7 @@ class TestModelDownloader:
     def test_config_hf_repo_id_set(self, tmp_path):
         """YAML에서 hf_repo_id 설정 시 정상 로드."""
         config = {
-            "pipeline": {"name": "Test", "steps": {"docker": True, "evaluate": True, "submit": False}, "cleanup_docker": True},
+            "pipeline": {"name": "Test", "mode": "lmdeploy", "steps": {"docker": True, "evaluate": True, "submit": False}, "cleanup_docker": True},
             "retry": {"max_attempts": 1, "wait_seconds": 5},
             "docker": {
                 "container_name": "test",

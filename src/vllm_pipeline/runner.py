@@ -16,7 +16,9 @@ import time
 from .config import PipelineConfig, load_pipeline_config
 from .docker_manager import check_existing_container, start_container, stop_container, wait_for_ready
 from .evaluator import run_evaluation
+from .model_downloader import ensure_model
 from .submitter import submit_results
+from .tokenizer_patcher import patch_tokenizer_config
 
 # 프로세스 수준 cleanup 상태 (signal handler/atexit에서 참조)
 _cleanup_state: dict = {
@@ -76,7 +78,7 @@ def run_pipeline(yaml_path: str, override_steps: list[str] | None = None) -> Non
     5. [CLEANUP] Docker 컨테이너 정리
     6. 최종 리포트
     """
-    cfg = load_pipeline_config(yaml_path)
+    cfg = load_pipeline_config(yaml_path, expected_mode="vllm")
 
     steps = dict(cfg.steps)
     if override_steps is not None:
@@ -92,6 +94,7 @@ def run_pipeline(yaml_path: str, override_steps: list[str] | None = None) -> Non
     print(f"Retry    : max={cfg.retry_max_attempts}, wait={cfg.retry_wait_seconds}s")
 
     report = {
+        "model": None,
         "docker": None,
         "eval": None,
         "submit": None,
@@ -100,6 +103,27 @@ def run_pipeline(yaml_path: str, override_steps: list[str] | None = None) -> Non
 
     pipeline_start = time.time()
     docker_started = False
+
+    # ── MODEL: HF 선제 다운로드 + Unsloth tokenizer 패치 ──
+    try:
+        download_result = ensure_model(cfg.docker)
+    except RuntimeError as e:
+        report["model"] = f"Download failed: {e}"
+        print(f"\n[PIPELINE] Model download failed - aborting pipeline")
+        total_elapsed = time.time() - pipeline_start
+        _print_report(cfg.name, report, total_elapsed)
+        return
+
+    try:
+        patch_result = patch_tokenizer_config(cfg.docker.hf_repo_id or cfg.docker.model)
+    except Exception as e:  # patch 실패는 치명적이지 않음 - 경고만
+        print(f"[MODEL] tokenizer_patch skipped due to error: {e}")
+        patch_result = {"patched": False, "reason": "error", "file": None}
+
+    report["model"] = (
+        f"downloaded={download_result['downloaded']}, "
+        f"tokenizer_patch={patch_result['reason']}"
+    )
 
     # signal handler / atexit 등록
     _cleanup_state["container_name"] = cfg.docker.container_name
@@ -209,6 +233,9 @@ def _print_report(name: str, report: dict, total_seconds: float) -> None:
     print(f"\n{'=' * 60}")
     print(f"Pipeline Complete: {name}")
     print(f"{'=' * 60}")
+
+    if report.get("model"):
+        print(f"[MODEL]   V {report['model']}")
 
     if report["docker"]:
         ok = "V" if "ready" in report["docker"] else "X"

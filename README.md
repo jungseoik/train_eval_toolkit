@@ -226,7 +226,9 @@ PYTHONPATH="$(pwd)" torchrun --nproc_per_node=2 src/evaluation/evaluate_video_cl
 
 #### 4-4) vLLM 자동화 파이프라인 (Docker → 평가 → 제출)
 
-YAML 설정 하나로 Docker 컨테이너 기동부터 벤치마크 평가, 결과 제출, 컨테이너 정리까지 자동 실행합니다. 각 벤치마크는 독립 subprocess에서 실행되어 메모리가 안정적으로 유지됩니다.
+YAML 설정 하나로 MODEL 단계(HF 선제 다운로드 + Unsloth tokenizer 자동 패치), Docker 컨테이너 기동, 벤치마크 평가, 결과 제출, 컨테이너 정리까지 자동 실행합니다. 각 벤치마크는 독립 subprocess에서 실행되어 메모리가 안정적으로 유지됩니다.
+
+> **`pipeline.mode: "vllm"` 필수**. 이 필드 없는 YAML은 CLI/API 모두 ValueError로 거절됩니다.
 
 ```bash
 conda activate llm
@@ -254,6 +256,8 @@ evaluate:
 #### 4-5) LMDeploy 벤치마크 파이프라인 (파인튜닝 모델)
 
 파인튜닝 완료된 InternVL3 계열 로컬 모델의 **최종 벤치마크 평가** 전용 파이프라인입니다. 테스트셋 평가(Precision/Recall/F1)와는 별개로, PoC 리더보드 벤치마크 테스트에 사용합니다. YAML 설정 하나로 모델 존재 확인(없으면 HuggingFace 자동 다운로드), Docker 컨테이너(LMDeploy) 기동, 벤치마크 평가, 결과 제출, 컨테이너 정리까지 자동 실행합니다.
+
+> **`pipeline.mode: "lmdeploy"` 필수**. 이 필드 없는 YAML은 CLI/API 모두 ValueError로 거절됩니다.
 
 ```bash
 conda activate llm
@@ -290,12 +294,17 @@ evaluate:
 > YAML 설정 작성법: [docs/eval/lmdeploy_yaml_guide.md](docs/eval/lmdeploy_yaml_guide.md)
 > 프로세스 설계 배경 및 흐름도: [docs/eval/eval_process_design.md](docs/eval/eval_process_design.md)
 
-#### 4-6) 평가 요청 API (외부 요청용)
+#### 4-6) 평가 요청 API (외부 요청용, vLLM/LMDeploy 듀얼 모드)
 
-내부망에서 YAML 설정 파일을 전송하면 LMDeploy 벤치마크 평가를 자동 실행하는 API 서버입니다. 각 벤치마크는 독립 subprocess에서 실행되어 메모리가 안정적으로 유지됩니다. SSE로 실시간 진행 상황을 확인할 수 있으며, GPU VRAM 사용량이 50GB 이상이면 요청을 거절합니다.
+내부망에서 YAML 설정 파일을 전송하면 YAML의 `pipeline.mode` 값에 따라 **vLLM 또는 LMDeploy** 벤치마크 평가를 자동 실행하는 API 서버입니다. 각 벤치마크는 독립 subprocess에서 실행되어 메모리가 안정적으로 유지됩니다. SSE로 실시간 진행 상황을 확인할 수 있으며, GPU VRAM 사용량이 50GB 이상이면 요청을 거절합니다.
 
 ```bash
 # 서버 주소: http://172.168.43.214:9000
+# vLLM 모드 요청 (YAML에 pipeline.mode: "vllm" 포함)
+curl -N -F 'file=@configs/vllm_pipeline/qwen35_2b_falldown_v1_3.yaml' \
+  http://172.168.43.214:9000/pipeline/run/file
+
+# LMDeploy 모드 요청 (YAML에 pipeline.mode: "lmdeploy" 포함)
 # YAML 파일로 평가 요청 (SSE 스트리밍 응답)
 curl -N -F 'file=@configs/lmdeploy_pipeline/InternVL3-2B_fire.yaml' \
   http://172.168.43.214:9000/pipeline/run/file

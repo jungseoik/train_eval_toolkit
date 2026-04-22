@@ -19,6 +19,7 @@
 
 pipeline:
   name: "Cosmos-Reason2-2B Falldown Benchmark"
+  mode: "vllm"
   steps:
     docker: true
     evaluate: true

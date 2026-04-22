@@ -19,6 +19,7 @@
 
 pipeline:
   name: "Cosmos-Reason2-2B Fire Benchmark"
+  mode: "vllm"
   steps:
     docker: true
     evaluate: true

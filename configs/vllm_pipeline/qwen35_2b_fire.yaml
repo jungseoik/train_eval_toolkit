@@ -13,6 +13,7 @@
 
 pipeline:
   name: "Qwen3.5-2B Fire Benchmark"
+  mode: "vllm"
   steps:
     docker: true
     evaluate: true

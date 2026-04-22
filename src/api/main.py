@@ -1,6 +1,7 @@
 """
-LMDeploy 벤치마크 평가 파이프라인 API 서버.
+모델 평가 파이프라인 API 서버 (vLLM / LMDeploy 듀얼 모드).
 
+YAML `pipeline.mode` 필드 값에 따라 vLLM 또는 LMDeploy 백엔드로 자동 디스패치.
 SSE(Server-Sent Events)로 실시간 진행 상황을 스트리밍.
 한 번에 하나의 평가만 처리 (동시 요청 거절).
 
@@ -61,9 +62,9 @@ def check_gpu_vram() -> tuple[bool, str]:
         return True, f"GPU 체크 실패: {e} (체크 건너뜀)"
 
 app = FastAPI(
-    title="LMDeploy Pipeline API",
-    description="LMDeploy 벤치마크 평가 파이프라인 요청 서버",
-    version="1.0.0",
+    title="Model Eval Pipeline API",
+    description="vLLM/LMDeploy 벤치마크 평가 파이프라인 요청 서버 (mode 디스패치)",
+    version="2.0.0",
 )
 
 # 전역 상태
@@ -101,7 +102,7 @@ class YamlRequest(BaseModel):
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "server": "LMDeploy Pipeline API", "port": 9000}
+    return {"status": "ok", "server": "Model Eval Pipeline API", "port": 9000}
 
 
 @app.get("/pipeline/status")
@@ -137,7 +138,7 @@ async def run_from_file(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail={
             "status": "error",
             "message": result,
-            "hint": "YAML 형식을 확인해주세요. 작성 가이드: docs/eval/lmdeploy_yaml_guide.md",
+            "hint": "YAML 형식을 확인해주세요. 작성 가이드: docs/eval/pipeline_api.md (vLLM은 vllm_pipeline.md, LMDeploy는 lmdeploy_yaml_guide.md)",
         })
 
     # 경로 검증 (bench_base_path, 벤치마크 폴더 존재 여부)
@@ -190,7 +191,7 @@ async def run_from_yaml(body: YamlRequest):
         raise HTTPException(status_code=400, detail={
             "status": "error",
             "message": result,
-            "hint": "YAML 형식을 확인해주세요. 작성 가이드: docs/eval/lmdeploy_yaml_guide.md",
+            "hint": "YAML 형식을 확인해주세요. 작성 가이드: docs/eval/pipeline_api.md (vLLM은 vllm_pipeline.md, LMDeploy는 lmdeploy_yaml_guide.md)",
         })
 
     # 경로 검증 (bench_base_path, 벤치마크 폴더 존재 여부)

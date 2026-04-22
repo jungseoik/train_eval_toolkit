@@ -4,12 +4,25 @@
 
 Docker 컨테이너 실행, 벤치마크 평가, 결과 제출, 정리까지 이어지는 3단계 수동 프로세스를 YAML 설정 파일 하나로 자동화하는 파이프라인입니다. 모델만 교체하면 동일한 흐름으로 빠르게 테스트할 수 있습니다.
 
-**자동화 흐름**: Docker 컨테이너 기동 → vLLM 서버 준비 대기 → 벤치마크 평가 (벤치마크별 subprocess 분리 + Docker 재시작) → 결과 제출 → 컨테이너 정리
+**자동화 흐름**: MODEL 단계 (HF 선제 다운로드 + Unsloth tokenizer 자동 패치) → Docker 컨테이너 기동 → vLLM 서버 준비 대기 → 벤치마크 평가 (벤치마크별 subprocess 분리 + Docker 재시작) → 결과 제출 → 컨테이너 정리
 
 각 벤치마크는 독립 subprocess에서 실행되어 메모리 누적이 방지됩니다.
 `docker_restart_interval: 1`(기본값)이면 매 벤치마크 사이에 Docker를 재시작하여 서버 측 메모리도 초기화합니다.
 
 > 프로세스 설계 배경 및 상세 흐름도: [eval_process_design.md](eval_process_design.md)
+
+## `pipeline.mode` 필수
+
+이 파이프라인의 모든 YAML은 `pipeline.mode: "vllm"` 필드를 반드시 포함해야 합니다. 누락 또는 불일치 시 CLI가 즉시 ValueError로 중단합니다(예: `python -m src.vllm_pipeline`로 `mode: "lmdeploy"` YAML 실행 시 실패).
+
+## MODEL 단계 (Unsloth 대응)
+
+vLLM CLI/API 모두 Docker 기동 전에 다음을 수행합니다.
+
+1. `docker.hf_repo_id`가 지정되어 있으면 `huggingface_hub.snapshot_download`로 HF 캐시에 선제 다운로드합니다.
+2. 이후 `src/vllm_pipeline/tokenizer_patcher.py`가 캐시된 `tokenizer_config.json`을 스캔해 `"tokenizer_class": "TokenizersBackend"`가 있으면 `"Qwen2Tokenizer"`로 교체합니다. 공식 Qwen 계열은 `already_ok`로 skip(멱등). 실제 패치는 Docker 데몬을 통한 `docker run --rm alpine sed` 경로로 수행되어 root 소유 캐시 파일도 안전하게 처리합니다.
+
+> Unsloth 파인튜닝 모델 tokenizer 이슈 상세: `.docs/task/26_api_dual_mode.md` 참조.
 
 ---
 
@@ -37,6 +50,7 @@ python -m src.vllm_pipeline -c configs/vllm_pipeline/qwen35_2b_fire.yaml --steps
 | 키 | 타입 | 기본값 | 설명 |
 |----|------|--------|------|
 | `pipeline.name` | str | 필수 | 파이프라인 이름 (로그에 표시) |
+| `pipeline.mode` | str | 필수 | `"vllm"` 고정. `"lmdeploy"` 등을 쓰면 CLI/API가 거절 |
 | `pipeline.steps.docker` | bool | true | Docker 컨테이너 관리 단계 실행 여부 |
 | `pipeline.steps.evaluate` | bool | true | 벤치마크 평가 단계 실행 여부 |
 | `pipeline.steps.submit` | bool | true | 결과 제출 단계 실행 여부 |
@@ -60,7 +74,8 @@ python -m src.vllm_pipeline -c configs/vllm_pipeline/qwen35_2b_fire.yaml --steps
 | `docker.port` | int | 8000 | 호스트 포트 |
 | `docker.ipc` | str | "host" | IPC 모드 |
 | `docker.volumes` | list | [] | 볼륨 마운트 |
-| `docker.model` | str | 필수 | HuggingFace 모델 이름 |
+| `docker.model` | str | 필수 | HuggingFace 모델 이름 (컨테이너가 직접 로드) |
+| `docker.hf_repo_id` | str | `""` | 지정 시 MODEL 단계에서 `snapshot_download`로 선제 다운로드. 기본은 `docker.model`을 그대로 검사 |
 | `docker.vllm_args` | dict | {} | vLLM 서버 추가 인자 |
 | `docker.startup.timeout_seconds` | int | 300 | 서버 준비 대기 최대 시간 |
 | `docker.startup.poll_interval_seconds` | int | 5 | health check 폴링 간격 |
