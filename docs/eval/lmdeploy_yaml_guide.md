@@ -34,6 +34,7 @@ cp configs/lmdeploy_pipeline/template/template.yaml configs/lmdeploy_pipeline/{�
 
 pipeline:
   name: "PIA_AI2team_VQA_falldown Benchmark (LMDeploy)"   # <-- 변경: 파이프라인 식별 이름
+  mode: "lmdeploy"                                          # <-- 고정값 (API/CLI 디스패치 키)
   steps:
     docker: true
     evaluate: true
@@ -528,6 +529,7 @@ submit:
 | 필드 | 예시 | 설명 |
 |------|------|------|
 | `pipeline.name` | `"MyModel Falldown Benchmark (LMDeploy)"` | 식별 이름 |
+| `pipeline.mode` | `"lmdeploy"` | **필수** — API/CLI mode guard에 사용. `"vllm"`으로 바꾸면 LMDeploy 경로에서 ValueError |
 | `docker.container_name` | `"mymodel_lmdeploy"` | 고유한 컨테이너명 |
 | `docker.model_path` | `"ckpts/MyModel"` | 로컬 모델 경로 |
 | `docker.hf_repo_id` | `"org/MyModel"` | (선택) HF repo ID |

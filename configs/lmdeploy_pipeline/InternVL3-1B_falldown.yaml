@@ -13,6 +13,7 @@
 
 pipeline:
   name: "InternVL3-1B Falldown Benchmark (LMDeploy)"
+  mode: "lmdeploy"
   steps:
     docker: true
     evaluate: true

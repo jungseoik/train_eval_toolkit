@@ -12,6 +12,7 @@
 
 pipeline:
   name: "Qwen3.5-9B-AWQ Smoke Benchmark"
+  mode: "vllm"
   steps:
     docker: true
     evaluate: true

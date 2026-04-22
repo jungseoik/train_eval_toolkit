@@ -13,6 +13,7 @@
 
 pipeline:
   name: "Qwen3.5-0.8B Smoke Soil_v2 Benchmark"
+  mode: "vllm"
   steps:
     docker: true
     evaluate: true

@@ -13,6 +13,7 @@
 
 pipeline:
   name: "PIA_AI2team_VQA_falldown_v1.0 Benchmark (LMDeploy)"
+  mode: "lmdeploy"
   steps:
     docker: true
     evaluate: true

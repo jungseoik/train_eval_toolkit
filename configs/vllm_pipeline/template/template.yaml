@@ -17,6 +17,7 @@
 
 pipeline:
   name: "{모델명} {카테고리} Benchmark"                  # <-- 변경
+  mode: "vllm"
   steps:
     docker: true
     evaluate: true

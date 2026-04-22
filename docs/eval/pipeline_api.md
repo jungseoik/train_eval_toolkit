@@ -1,10 +1,22 @@
-# LMDeploy 평가 요청 API
+# 모델 평가 요청 API (vLLM / LMDeploy 듀얼 모드)
 
-외부에서 YAML 설정 파일을 전송하여 LMDeploy 벤치마크 평가를 요청하는 API 서버입니다.
-SSE(Server-Sent Events)로 실시간 진행 상황을 확인할 수 있습니다.
+외부에서 YAML 설정 파일을 전송하여 vLLM 또는 LMDeploy 벤치마크 평가를 요청하는 API 서버입니다.
+YAML의 `pipeline.mode` 필드에 따라 백엔드가 자동 선택됩니다. SSE(Server-Sent Events)로 실시간 진행 상황을 확인할 수 있습니다.
 
-- YAML 설정 작성법: [lmdeploy_yaml_guide.md](lmdeploy_yaml_guide.md)
-- 파이프라인 사용법: [lmdeploy_pipeline.md](lmdeploy_pipeline.md)
+- vLLM YAML 작성법: [vllm_pipeline.md](vllm_pipeline.md)
+- LMDeploy YAML 작성법: [lmdeploy_yaml_guide.md](lmdeploy_yaml_guide.md)
+- 파이프라인 사용법(CLI): [vllm_pipeline.md](vllm_pipeline.md), [lmdeploy_pipeline.md](lmdeploy_pipeline.md)
+
+## pipeline.mode 필드 (필수)
+
+모든 요청 YAML은 `pipeline.mode` 필드를 **반드시** 포함해야 합니다. 값은 다음 중 하나입니다.
+
+| mode | 서빙 백엔드 | 필수 스키마 | 비고 |
+|------|-------------|-------------|------|
+| `"vllm"` | vLLM (HuggingFace 직접 로드) | `docker.model`, `vllm_args` | Unsloth 파인튜닝 모델 tokenizer 자동 패치 수행 |
+| `"lmdeploy"` | LMDeploy (로컬 볼륨 마운트) | `docker.model_path`, `lmdeploy_args` | `docker.hf_repo_id` 지정 시 자동 사전 다운로드 |
+
+mode 누락 또는 지원 외 값 → **400 Bad Request**. mode와 YAML 스키마가 불일치(예: vLLM 모드에 `model_path`)하면 **400 Bad Request**.
 
 ---
 
@@ -34,7 +46,13 @@ SSE(Server-Sent Events)로 실시간 진행 상황을 확인할 수 있습니다
 ### 파일 업로드로 평가 요청
 
 ```bash
-curl -N -F 'file=@config.yaml' http://172.168.43.214:9000/pipeline/run/file
+# vLLM 모드 (pipeline.mode: "vllm")
+curl -N -F 'file=@configs/vllm_pipeline/qwen35_2b_falldown_v1_3.yaml' \
+  http://172.168.43.214:9000/pipeline/run/file
+
+# LMDeploy 모드 (pipeline.mode: "lmdeploy")
+curl -N -F 'file=@configs/lmdeploy_pipeline/PIA_AI2team_VQA_falldown_v1.0.yaml' \
+  http://172.168.43.214:9000/pipeline/run/file
 ```
 
 `-N` 옵션은 버퍼링을 비활성화하여 SSE 이벤트를 실시간으로 출력합니다.
@@ -100,7 +118,7 @@ curl http://172.168.43.214:9000/health
 ```
 
 ```json
-{"status": "ok", "server": "LMDeploy Pipeline API", "port": 9000}
+{"status": "ok", "server": "Model Eval Pipeline API", "port": 9000}
 ```
 
 ---
@@ -200,28 +218,36 @@ if status.get("error"):
 | `received` | YAML 수신 | 파일/문자열 수신 완료 |
 | `yaml_validated` | YAML 검증 | 파싱 + 필수 키 확인 통과 |
 | `config_loaded` | 설정 로드 | PipelineConfig 생성 완료 |
-| `model_check` | 모델 확인 | 로컬 모델 존재 확인 시작 |
-| `model_ready` | 모델 준비 | 모델 사용 가능 (필요 시 HF 다운로드 포함) |
+| `model_check` | 모델 확인 | LMDeploy: 로컬 경로 존재 확인 / vLLM: HF 캐시 확인 + tokenizer_patch 수행 |
+| `model_ready` | 모델 준비 | LMDeploy는 `{"model_path": ...}`, vLLM은 `{"downloaded": bool, "tokenizer_patch": "patched\|already_ok\|not_in_cache"}` 포함 |
 | `docker_starting` | Docker 기동 | 컨테이너 생성 시작 |
-| `docker_waiting` | 서버 대기 | LMDeploy API 서버 준비 대기 중 |
+| `docker_waiting` | 서버 대기 | 백엔드(vLLM/LMDeploy) API 서버 준비 대기 중 |
 | `docker_ready` | 서버 준비 완료 | API 서버 응답 확인, 소요 시간 포함 |
 | `eval_started` | 평가 시작 | 벤치마크 평가 시작됨 |
 | `done` | 완료 | SSE 스트리밍 종료. 평가는 백그라운드 subprocess에서 계속 진행 |
 | `error` | 에러 | 에러 발생. `message`에 에러 내용, `hint`에 대처법 포함 |
 
-### SSE 출력 예시
+### SSE 출력 예시 (vLLM)
 
 ```
 data: {"step": "received", "message": "YAML 수신 완료"}
-data: {"step": "yaml_validated", "message": "YAML 검증 완료"}
-data: {"step": "config_loaded", "message": "파이프라인: InternVL3-2B Fire Benchmark (LMDeploy)"}
-data: {"step": "model_check", "message": "모델 확인 중..."}
-data: {"step": "model_ready", "message": "모델 준비 완료: ckpts/InternVL3-2B"}
+data: {"step": "yaml_validated", "message": "YAML 검증 완료", "mode": "vllm"}
+data: {"step": "config_loaded", "message": "파이프라인: PIA_AI2team_VQA_falldown_v1.3 Benchmark (vLLM)", "mode": "vllm"}
+data: {"step": "model_check", "message": "모델 준비 중..."}
+data: {"step": "model_ready", "message": "모델 준비 완료: repo=PIA-SPACE-LAB/..., downloaded=false, tokenizer_patch=already_ok", "downloaded": false, "tokenizer_patch": "already_ok"}
 data: {"step": "docker_starting", "message": "Docker 컨테이너 기동 중..."}
-data: {"step": "docker_waiting", "message": "LMDeploy 서버 준비 대기 중..."}
-data: {"step": "docker_ready", "message": "컨테이너 준비 완료 (20.1s)"}
-data: {"step": "eval_started", "message": "벤치마크 평가 시작 (6개). 리더보드에서 결과를 확인하세요."}
+data: {"step": "docker_waiting", "message": "vLLM 서버 준비 대기 중..."}
+data: {"step": "docker_ready", "message": "컨테이너 준비 완료 (255.8s)"}
+data: {"step": "eval_started", "message": "벤치마크 평가 시작 (2개). 리더보드에서 결과를 확인하세요."}
 data: {"step": "done", "message": "평가가 시작되었습니다. 추후 벤치마크 결과를 리더보드에서 확인해보세요."}
+```
+
+### SSE 출력 예시 (LMDeploy)
+
+```
+data: {"step": "yaml_validated", "message": "YAML 검증 완료", "mode": "lmdeploy"}
+data: {"step": "model_ready", "message": "모델 준비 완료: model_path=ckpts/InternVL3-2B", "model_path": "ckpts/InternVL3-2B"}
+data: {"step": "docker_waiting", "message": "LMDeploy 서버 준비 대기 중..."}
 ```
 
 ---
@@ -301,10 +327,14 @@ data: {"step": "error", "message": "Docker 기동 실패: ...", "hint": "docker.
 |------|------|------|
 | 경로 검증 에러 (400) | `bench_base_path` 오타/잘못된 경로 | `evaluate.bench_base_path` 경로 확인 |
 | 벤치마크 폴더 미존재 (400) | 벤치마크 폴더가 서버에 없음 | `evaluate.benchmarks` 목록의 폴더명 확인 |
+| `pipeline.mode` 누락/불일치 (400) | mode 필드 없음 또는 오타 | `"vllm"` 또는 `"lmdeploy"` 설정 |
 | GPU 사용 중 (503) | VRAM 50GB 이상 사용 중 | 담당자에게 GPU 리소스 문의 |
-| Docker OOM | GPU 메모리 부족 | `lmdeploy_args.tp` 증가 또는 `cache-max-entry-count` 축소 |
+| Docker OOM (vLLM) | GPU 메모리 부족 | `vllm_args.kv-cache-memory-bytes` 축소 또는 `tensor-parallel-size` 증가 |
+| Docker OOM (LMDeploy) | GPU 메모리 부족 | `lmdeploy_args.tp` 증가 또는 `cache-max-entry-count` 축소 |
 | 포트 충돌 | 이미 사용 중인 포트 | `docker.port` 변경 |
-| 모델 미존재 | 경로 오류 | `docker.model_path` 확인 또는 `hf_repo_id` 설정 |
+| 모델 미존재 (vLLM) | HF repo ID 오타 | `docker.model` 확인 또는 `hf_repo_id` 지정 |
+| 모델 미존재 (LMDeploy) | 로컬 경로 오류 | `docker.model_path` 확인 또는 `hf_repo_id` 설정 |
+| Tokenizer `TokenizersBackend` 에러 (vLLM) | Unsloth 저장 모델 호환성 | `src/vllm_pipeline/tokenizer_patcher.py`가 자동 패치. 실패 시 Docker 데몬 상태 확인 |
 | 서버 준비 시간 초과 | 대형 모델 로딩 지연 | `startup.timeout_seconds` 증가 |
 
 ### 전체 벤치마크 실패 시 (`/pipeline/status`)

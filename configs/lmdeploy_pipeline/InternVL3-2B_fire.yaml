@@ -13,6 +13,7 @@
 
 pipeline:
   name: "InternVL3-2B Fire Benchmark (LMDeploy)"
+  mode: "lmdeploy"
   steps:
     docker: true
     evaluate: true

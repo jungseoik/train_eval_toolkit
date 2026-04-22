@@ -161,6 +161,7 @@ python -m src.lmdeploy_pipeline -c configs/lmdeploy_pipeline/InternVL3-2B_fire.y
 | 키 | 타입 | 기본값 | 설명 |
 |---|---|---|---|
 | `pipeline.name` | str | 필수 | 파이프라인 이름 |
+| `pipeline.mode` | str | 필수 | `"lmdeploy"` 고정. CLI/API가 mode 일치 여부를 검증 |
 | `pipeline.steps.docker` | bool | `true` | Docker 단계 실행 여부 |
 | `pipeline.steps.evaluate` | bool | `true` | 평가 단계 실행 여부 |
 | `pipeline.steps.submit` | bool | `true` | 제출 단계 실행 여부 |

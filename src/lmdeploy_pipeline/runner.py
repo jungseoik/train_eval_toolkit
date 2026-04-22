@@ -78,7 +78,7 @@ def run_pipeline(yaml_path: str, override_steps: list[str] | None = None) -> Non
     6. [CLEANUP] Docker 컨테이너 정리
     7. 최종 리포트
     """
-    cfg = load_pipeline_config(yaml_path)
+    cfg = load_pipeline_config(yaml_path, expected_mode="lmdeploy")
 
     steps = dict(cfg.steps)
     if override_steps is not None:

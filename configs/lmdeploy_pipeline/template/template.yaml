@@ -19,6 +19,7 @@
 
 pipeline:
   name: "{모델명} {카테고리} Benchmark (LMDeploy)"     # <-- 변경
+  mode: "lmdeploy"
   steps:
     docker: true
     evaluate: true
