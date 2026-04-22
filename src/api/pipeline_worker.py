@@ -62,15 +62,21 @@ def _load_backend(mode: str) -> dict[str, Any]:
             try:
                 patch = tp_mod.patch_tokenizer_config(cfg.docker.hf_repo_id or cfg.docker.model)
             except Exception as e:
-                patch = {"patched": False, "reason": f"error:{e}", "file": None}
+                patch = {
+                    "patched": False, "reason": f"error:{e}", "file": None,
+                    "model_type": None, "tokenizer_class": None,
+                }
             return {
                 "downloaded": download["downloaded"],
                 "repo_id": download["repo_id"],
                 "tokenizer_patch": patch["reason"],
+                "model_type": patch.get("model_type"),
+                "tokenizer_class": patch.get("tokenizer_class"),
                 "summary": (
                     f"repo={download['repo_id']}, "
                     f"downloaded={download['downloaded']}, "
                     f"tokenizer_patch={patch['reason']}"
+                    + (f", model_type={patch.get('model_type')}" if patch.get("model_type") else "")
                 ),
             }
 

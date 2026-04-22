@@ -20,9 +20,12 @@ Docker 컨테이너 실행, 벤치마크 평가, 결과 제출, 정리까지 이
 vLLM CLI/API 모두 Docker 기동 전에 다음을 수행합니다.
 
 1. `docker.hf_repo_id`가 지정되어 있으면 `huggingface_hub.snapshot_download`로 HF 캐시에 선제 다운로드합니다.
-2. 이후 `src/vllm_pipeline/tokenizer_patcher.py`가 캐시된 `tokenizer_config.json`을 스캔해 `"tokenizer_class": "TokenizersBackend"`가 있으면 `"Qwen2Tokenizer"`로 교체합니다. 공식 Qwen 계열은 `already_ok`로 skip(멱등). 실제 패치는 Docker 데몬을 통한 `docker run --rm alpine sed` 경로로 수행되어 root 소유 캐시 파일도 안전하게 처리합니다.
+2. 이후 `src/vllm_pipeline/tokenizer_patcher.py`가 캐시된 `tokenizer_config.json`을 스캔해 `"tokenizer_class": "TokenizersBackend"`가 발견되면, **같은 snapshot의 `config.json`에서 `model_type`을 읽어 `MODEL_TYPE_TO_TOKENIZER` allowlist에 매칭될 때만** 해당 tokenizer_class로 치환합니다. 현재 기본 매핑은 `{"qwen3_5": "Qwen2Tokenizer"}` 한 건뿐이므로, qwen3_5 이외의 모델(Cosmos, 공식 Qwen, Llama 계열 등)은 `already_ok` / `unsupported_model_type` / `not_in_cache`로 **파일을 건드리지 않고 지나갑니다** (안전 기본값). 실제 패치는 Docker 데몬을 통한 `docker run --rm alpine sed` 경로로 수행되어 root 소유 캐시 파일도 안전하게 처리합니다.
 
-> Unsloth 파인튜닝 모델 tokenizer 이슈 상세: `.docs/task/26_api_dual_mode.md` 참조.
+새 base 모델군에서 같은 이슈가 발견되면 `MODEL_TYPE_TO_TOKENIZER` dict에 `"<model_type>": "<TokenizerClass>"` 한 줄 추가로 확장됩니다. 테스트/긴급 대응용으로 `patch_tokenizer_config(model_id, model_type_to_tokenizer=...)` override도 제공됩니다.
+
+> Unsloth 파인튜닝 모델 tokenizer 이슈 상세: `.docs/task/26_api_dual_mode.md`.
+> allowlist 기반 가드 강화: `.docs/task/27_tokenizer_patcher_model_type_guard.md`.
 
 ---
 
