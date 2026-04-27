@@ -39,7 +39,7 @@ docker:
   vllm_args:
     tensor-parallel-size: 1
     max-model-len: 8192
-    kv-cache-memory-bytes: "10G"
+    kv-cache-memory-bytes: "1G"
     max-num-seqs: 128
     max-num-batched-tokens: 131072
     limit-mm-per-prompt: '{"image": 1}'
@@ -62,18 +62,7 @@ evaluate:
 
   benchmarks:
     - "ABB_Falldown"
-    - "Coupang_Falldown"
-    - "DTRO_Falldown"
-    - "GangNam_Falldown"
     - "Hyundai_Falldown"
-    - "Innodep_Falldown"
-    - "KhonKaen_Falldown"
-    - "KISA_Falldown"
-    - "Kumho_Falldown"
-    - "PIA_Falldown"
-    - "Soil_Falldown"
-    - "UGO_Falldown"
-    - "Yonsei_Falldown"
 
   # 프레임 샘플링 (Falldown: 30)
   window_size: 30
